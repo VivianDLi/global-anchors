@@ -13,6 +13,7 @@ from globalanchors.types import (
     CandidateAnchor,
     BeamState,
     ExplainerOutput,
+    Model,
 )
 
 
@@ -77,7 +78,7 @@ class TextAnchors:
         # calculate new anchors by adding each feature to existing candidates and update state
         new_candidates: List[CandidateAnchor] = []
         for f_i in feature_indices:
-            feat_cand = state.find_anchor([f_i])
+            feat_cand = state.get_anchor([f_i])
             for p_cand in past_candidates:
                 new_feat_indices = p_cand.feat_indices.union(set([f_i]))
                 # check for duplicates
@@ -202,23 +203,24 @@ class TextAnchors:
         sorted_means = np.argsort(means)
         return sorted_means[-top_n:]
 
-    def _beam_search(self, example: str, model) -> CandidateAnchor:
+    def _beam_search(self, example: str, model: Model) -> CandidateAnchor:
         """Performs beam-search to greedily find the best anchors as explanations.
 
         Args:
             example (str): String of text to generate an explanation for.
-            model (_type_): Model to generate explanations for.
+            model (Model): Model to generate explanations for.
 
         Returns:
             CandidateAnchor: Best explanation found for the current model and example.
         """
+        example_data = InputData(example, model)
         # generate massive amount of data to estimate coverage
         coverage_data = self.sampler.sample(
-            example, model, self.coverage_samples
+            example_data, model, n=self.coverage_samples
         ).data
         # generate neighbourhood samples
         neighbourhood = self.sampler.sample(
-            example, model, max(1, self.min_start_samples)
+            example_data, model, n=max(1, self.min_start_samples)
         )
         # evaluate lower bound precision of candidates
         mean = neighbourhood.labels.mean()
@@ -230,7 +232,10 @@ class TextAnchors:
             and lower_bound < self.confidence_threshold - self.epsilon
         ):
             neighbourhood = self.sampler.sample(
-                self.beam_size, current=neighbourhood
+                example_data,
+                model,
+                n=self.beam_size,
+                neighbourhood=neighbourhood,
             )
             mean = neighbourhood.labels.mean()
             lower_bound = bernoulli_lb(
@@ -255,7 +260,6 @@ class TextAnchors:
         ## enter main beam search loop
         # pre-allocate neighbourhood data memory
         neighbourhood.prealloc_size = self.batch_size * 10000
-        neighbourhood.current_idx = neighbourhood.data.shape[0]
         neighbourhood.reallocate()
         # initial loop state
         state = {
@@ -263,7 +267,8 @@ class TextAnchors:
             "anchors": [],
             "coverage_data": coverage_data,
             "n_features": neighbourhood.data.shape[1],
-            "example": InputData(example, model),
+            "example": example_data,
+            "model": model,
         }
         state.initialize_features()
         current_size = 1
@@ -287,7 +292,6 @@ class TextAnchors:
                     f"Stopping beam-search early at anchor size {current_size} / {self.max_anchor_size} from no more candidates."
                 )
                 break
-            state["anchors"] = candidates
             # select the new best candidates with confidence bounds
             candidate_indices = self._get_best_candidates(candidates, state)
             best_anchors_per_size[current_size] = [
@@ -377,13 +381,13 @@ class TextAnchors:
         return best_anchor
 
     def explain(
-        self, example: Union[str, bytes], model, **kwargs
+        self, example: Union[str, bytes], model: Model, **kwargs
     ) -> ExplainerOutput:
         """Creates local explanations for a textual example using Anchors for a given model.
 
         Args:
             example (str): Textual example to generate explanations for.
-            model: ML Model to explain.
+            model (Model): ML Model to explain.
         """
         # optionally decode a byte input
         if type(example) == bytes:

@@ -1,7 +1,16 @@
 """Types used in the library."""
 
 from dataclasses import dataclass
-from typing import List, Literal, Set, TypedDict
+from typing import (
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Set,
+    Tuple,
+    TypedDict,
+)
 import numpy as np
 import spacy
 
@@ -12,6 +21,8 @@ from loguru import logger
 NeighbourhoodSamplerType = Literal["GA", "POS", "UNK"]
 ModelType = Literal["SVM", "RF", "MLP"]
 
+Model = Callable[[str], int]
+
 
 @dataclass
 class InputData:
@@ -20,7 +31,7 @@ class InputData:
     positions: np.array
     label: int
 
-    def __init__(self, text, model):
+    def __init__(self, text: str, model: Model):
         self.nlp = spacy.load("en_core_web_sm")
         self.text = text
         processed = self.nlp(text)
@@ -32,19 +43,28 @@ class InputData:
 
 @dataclass
 class NeighbourhoodData:
-    raw_data: np.ndarray  # words for each sample
+    string_data: np.ndarray  # words for each sample
     data: np.ndarray  # index toggles for each sample
     labels: np.array  # model output for each sample
     current_idx: int
     prealloc_size: int
 
+    def __init__(
+        self, string_data: np.ndarray, data: np.ndarray, labels: np.array
+    ):
+        self.string_data = string_data
+        self.data = data
+        self.labels = labels
+        self.current_idx = self.data.shape[0]
+        self.prealloc_size = 0
+
     def reallocate(self):
         """Pre-allocate new memory to internal storage arrays."""
-        self.raw_data = np.vstack(
-            self.raw_data,
+        self.string_data = np.vstack(
+            self.string_data,
             np.zeros(
-                (self.prealloc_size, self.raw_data.shape[1]),
-                self.raw_data.dtype,
+                (self.prealloc_size, self.string_data.shape[1]),
+                self.string_data.dtype,
             ),
         )
         self.data = np.vstack(
@@ -56,6 +76,32 @@ class NeighbourhoodData:
         self.labels = np.hstack(
             (self.labels, np.zeros(self.prealloc_size, self.labels.dtype))
         )
+
+    def update(
+        self,
+        new_string_data: np.ndarray,
+        new_data: np.ndarray,
+        new_labels: np.array,
+    ):
+        """Update existing neighbourhood data with new data."""
+        # update existing string_data dtype character lengths
+        if "<U" in str(new_string_data.dtype):
+            # set max string dtype to avoid string truncation (e.g., '<U308', '<U290' -> '<U308')
+            max_dtype = max(
+                str(self.string_data.dtype), str(new_string_data.dtype)
+            )
+            self.string_data = self.string_data.astype(max_dtype)
+            new_string_data = new_string_data.astype(max_dtype)
+        ## allocating necessary memory
+        new_idx = range(self.current_idx, self.current_idx + new_data.shape[0])
+        # make sure pre-allocated data arrays have enough space
+        while self.data.shape[0] < self.current_idx + new_data.shape[0]:
+            self.reallocate()
+        # update neighbourhood arrays
+        self.string_data[new_idx] = new_string_data
+        self.data[new_idx] = new_data
+        self.labels[new_idx] = new_labels
+        self.current_idx += new_data.shape[0]
 
 
 @dataclass
@@ -74,26 +120,27 @@ class CandidateAnchor:
 @dataclass
 class BeamState:
     neighbourhood: NeighbourhoodData
-    anchors: List[CandidateAnchor]
+    anchors: Dict[Tuple[int], CandidateAnchor]
     coverage_data: np.ndarray  # fixed data to calculate coverage
     n_features: int
     example: InputData
+    model: Model
 
-    def find_anchor(self, feature_indices):
+    def get_anchor(self, feature_indices: Iterable[int]) -> CandidateAnchor:
         """Finds an anchor in self.anchors based on feature indices in any order."""
         normalized_indices = normalize_feature_indices(feature_indices)
-        matches = [
-            anchor
-            for anchor in self.anchors
-            if normalize_feature_indices(anchor.feat_indices)
-            == normalized_indices
-        ]
-        if len(matches) == 0:
+        if normalized_indices not in self.anchors:
             logger.warning(
                 f"No matching anchors found for query: {feature_indices}. Returning None."
             )
             return None
-        return matches[0]
+        return self.anchors[normalized_indices]
+
+    def set_anchor(
+        self, feature_indices: Iterable[int], anchor: CandidateAnchor
+    ) -> None:
+        normalized_indices = normalize_feature_indices(feature_indices)
+        self.anchors[normalized_indices] = anchor
 
     def initialize_features(self):
         """Initializes candidates for individual features based on the neighbourhood."""
