@@ -20,14 +20,23 @@ from globalanchors.types import (
 class NeighbourhoodSampler(ABC):
     use_generator: bool = True
     use_generator_probabilities: bool = False
+    use_constant_probabilities: bool = False
 
     def __init__(
         self,
         use_generator: bool = True,
         use_generator_probabilities: bool = False,
+        use_constant_probabilities: bool = False,
     ):
         self.use_generator = use_generator
         self.use_generator_probabilities = use_generator_probabilities
+        self.use_constant_probabilities = use_constant_probabilities
+        if self.use_constant_probabilities:
+            self.use_generator = False
+            self.use_generator_probabilities = False
+            logger.info(
+                "For constant probabilities, the generator will not be initialized. Setting <use_generator> to False."
+            )
         if self.use_generator_probabilities:
             self.use_generator = True
             logger.info(
@@ -87,17 +96,22 @@ class NeighbourhoodSampler(ABC):
 
     @abstractmethod
     def perturb_samples(
-        self, example: InputData, fixed_indices: np.ndarray, model: Model
-    ) -> Tuple[np.ndarray, np.array]:
+        self,
+        example: InputData,
+        data: np.ndarray,
+        model: Model,
+        compute_labels: bool,
+    ) -> Tuple[np.ndarray, np.ndarray, np.array]:
         """Generates new text strings and labels in the neighbourhood of an example given the words in the example to replace.
 
         Args:
             example (InputData): Original text example of length w
-            fixed_indices (np.ndarray): Binary array of shape (n x w) with a 0 in the place of a word to replace.
+            data (np.ndarray): Binary array of shape (n x w) with a 0 in the place of a word to replace.
             model (Model): Model use to generate classification labels for generated text.
+            compute_labels (bool): If false, then returned prediction labels are a ones array.
 
         Returns:
-            Tuple[np.ndarray, np.array]: Tuple of new text string array and new array of model prediction labels.
+            Tuple[np.ndarray, np.ndarray, np.array]: Tuple of new text string array, fixed_indices, and new array of model prediction labels.
         """
         return NotImplementedError
 
@@ -107,6 +121,7 @@ class NeighbourhoodSampler(ABC):
         model: Model,
         n: int = 1,
         neighbourhood: NeighbourhoodData = None,
+        compute_labels: bool = True,
     ) -> NeighbourhoodData:
         """Samples data from the neighbourhood of an example, optionally updating a given neighbourhood.
 
@@ -115,6 +130,7 @@ class NeighbourhoodSampler(ABC):
             model (_type_): Model to explain and use to predict labels.
             n (int, optional): Number of new examples to generate. Defaults to 1.
             neighbourhood (NeighbourhoodData, optional): Optional neighbourhood to add newly generated examples to. Defaults to None.
+            compute_labels (bool, optional): Whether to also compute model labels for samples or not. Defaults to True.
 
         Returns:
             NeighbourhoodData: NeighbourhoodData object representing generated samples in the example neighbourhood.
@@ -137,14 +153,17 @@ class NeighbourhoodSampler(ABC):
                 probabilities[:, i] = min(
                     0.5, dict(zip(words, probs)).get(example.tokens[i], 0.01)
                 )
+        elif self.use_constant_probabilities:
+            # when generating from an anchor, only keep anchor features fixed (e.g., when doing GA sampling)
+            probabilities = np.zeros_like(probabilities)
         else:
             # randomly select each feature (i.e., probability = 0.5)
             probabilities = np.ones_like(probabilities) * 0.5
         # randomly choose either 0 and 1 for each sample/feature depending on probabilities
         random_sample = np.random.uniform(0, 1, size=probabilities.shape)
         new_data = (random_sample < probabilities).astype(int)
-        new_string_data, new_labels = self.perturb_samples(
-            example, new_data, model
+        new_string_data, new_data, new_labels = self.perturb_samples(
+            example, new_data, model, compute_labels=compute_labels
         )
         ## updating existing (optional) neighbourhood or creating a new one
         if neighbourhood is not None:
@@ -186,6 +205,9 @@ class NeighbourhoodSampler(ABC):
                     0.5,
                     dict(zip(words, probs)).get(state.example.tokens[i], 0.01),
                 )
+        elif self.use_constant_probabilities:
+            # when generating from an anchor, only keep anchor features fixed (e.g., when doing GA sampling)
+            probabilities = np.zeros_like(probabilities)
         else:
             # randomly select each feature (i.e., probability = 0.5)
             probabilities = np.ones_like(probabilities) * 0.5
@@ -194,7 +216,7 @@ class NeighbourhoodSampler(ABC):
         # randomly choose either 0 and 1 for each sample/feature depending on probabilities
         random_sample = np.random.uniform(0, 1, size=probabilities.shape)
         new_data = (random_sample < probabilities).astype(int)
-        new_string_data, new_labels = self.perturb_samples(
+        new_string_data, new_data, new_labels = self.perturb_samples(
             state.example, new_data, state.model
         )
         # update state neighbourhood

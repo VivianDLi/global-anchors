@@ -216,7 +216,7 @@ class TextAnchors:
         example_data = InputData(example, model)
         # generate massive amount of data to estimate coverage
         coverage_data = self.sampler.sample(
-            example_data, model, n=self.coverage_samples
+            example_data, model, n=self.coverage_samples, compute_labels=False
         ).data
         # generate neighbourhood samples
         neighbourhood = self.sampler.sample(

@@ -1,5 +1,6 @@
 """Types used in the library."""
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import (
     Callable,
@@ -14,6 +15,7 @@ from typing import (
 import numpy as np
 import spacy
 
+from globalanchors.local.utils import exp_normalize
 from globalanchors.utils import normalize_feature_indices
 
 from loguru import logger
@@ -21,14 +23,14 @@ from loguru import logger
 NeighbourhoodSamplerType = Literal["GA", "POS", "UNK"]
 ModelType = Literal["SVM", "RF", "MLP"]
 
-Model = Callable[[str], int]
+Model = Callable[[List[str]], List[int]]
 
 
 @dataclass
 class InputData:
     text: str
-    tokens: np.array
-    positions: np.array
+    tokens: np.array  # tokenized text (n_features)
+    positions: np.array  # positions for tokenized text (n_features)
     label: int
 
     def __init__(self, text: str, model: Model):
@@ -37,15 +39,14 @@ class InputData:
         processed = self.nlp(text)
         self.tokens = np.array([x.text for x in processed], dtype="|U80")
         self.positions = np.array([x.idx for x in processed])
-        # TODO: text definitely needs to have some preprocessing I think, but this is for multi-class support
-        self.label = model(text)
+        self.label = model([text])
 
 
 @dataclass
 class NeighbourhoodData:
-    string_data: np.ndarray  # words for each sample
-    data: np.ndarray  # index toggles for each sample
-    labels: np.array  # model output for each sample
+    string_data: np.ndarray  # input string for each sample (n x 1)
+    data: np.ndarray  # index toggles for each sample (n x n_features)
+    labels: np.array  # model output for each sample (n)
     current_idx: int
     prealloc_size: int
 
@@ -121,7 +122,9 @@ class CandidateAnchor:
 class BeamState:
     neighbourhood: NeighbourhoodData
     anchors: Dict[Tuple[int], CandidateAnchor]
-    coverage_data: np.ndarray  # fixed data to calculate coverage
+    coverage_data: (
+        np.ndarray
+    )  # fixed data to calculate coverage (n_c x n_features)
     n_features: int
     example: InputData
     model: Model
@@ -184,7 +187,91 @@ class BeamState:
 
 class ExplainerOutput(TypedDict):
     example: str
-    explanation: Set[str]
+    explanation: Set[str]  # features used by anchor
     precision: float
     coverage: float
     prediction: int
+
+
+## Genetic Algorithm Types
+
+DistanceFunctionType = Literal["cosine", "neuclid"]
+
+
+@dataclass
+class Individual:
+    gene: np.array
+    fitness: float
+
+    def __init__(self, gene: np.array, fitness: float):
+        self.gene = gene
+        self.fitness = fitness
+
+    def __lt__(self, other):
+        return self.fitness < other.fitness
+
+    def __le__(self, other):
+        return self.fitness <= other.fitness
+
+    def __eq__(self, other):
+        return self.fitness == other.fitness
+
+    def __ne__(self, other):
+        return self.fitness != other.fitness
+
+    def __gt__(self, other):
+        return self.fitness > other.fitness
+
+    def __ge__(self, other):
+        return self.fitness >= other.fitness
+
+
+@dataclass
+class Population:
+    individuals: List[Individual]
+    probs: List[float]
+
+    def __init__(
+        self,
+        example: InputData,
+        num_samples: int,
+        individuals: List[Individual] = None,
+        probs: List[float] = None,
+    ):
+        # setup initial population
+        if example is not None:
+            logger.debug("Initializing from example.")
+            initial_fitness = 0
+            self.individuals = sorted(
+                [
+                    Individual(example.tokens, initial_fitness)
+                    for _ in range(num_samples)
+                ]
+            )
+            self.probs = (np.ones(num_samples) / num_samples).tolist()
+        else:
+            logger.debug("Initializing from existing individuals.")
+            assert (
+                individuals is not None and probs is not None
+            ), "Individuals and probabilities must be provided."
+            self.individuals = individuals
+            self.probs = probs
+
+    def __init__(self, individuals: List[Individual], probs: List[float]):
+        self.individuals = individuals
+        self.probs = probs
+
+    def evaluate_fitness(self, fitness_fn: Callable[[Individual], float]):
+        """Calculates fitness for each individual, sorts the population, and normalizes fitness values into probabilities."""
+        fitnesses = []
+        for indv in self.individuals:
+            indv.fitness = fitness_fn(indv)
+            fitnesses.append(fitness_fn(indv))
+        self.probs = exp_normalize(
+            np.array(fitnesses) / sum(fitnesses)
+        ).tolist()
+
+    def copy(self):
+        return Population(
+            None, 0, individuals=deepcopy(self.individuals), probs=self.probs
+        )

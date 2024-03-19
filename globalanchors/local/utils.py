@@ -3,6 +3,9 @@
 Taken from the original Anchors paper (https://ojs.aaai.org/index.php/AAAI/article/view/11491)."""
 
 import numpy as np
+from numpy.linalg import norm
+
+from globalanchors.types import DistanceFunctionType
 
 
 def bernoulli_kl(p: float, q: float) -> float:
@@ -46,3 +49,30 @@ def exp_normalize(x: np.array) -> np.array:
     b = x.max()
     y = np.exp(x - b)
     return y / y.sum()
+
+
+def normalized_cosine_distance(x1: np.array, x2: np.array) -> float:
+    return (
+        1 - (np.dot(x1, x2) / (norm(x1) * norm(x2)))
+    ) / 2  # range of [0, 1]
+
+
+def normalized_squared_euclidean_distance(x1: np.array, x2: np.array) -> float:
+    """Taken from https://reference.wolfram.com/language/ref/NormalizedSquaredEuclideanDistance.html."""
+    x1_p = x1 - np.mean(x1)
+    x2_p = x2 - np.mean(x2)
+    return (
+        0.5 * norm(x1_p - x2_p) ** 2 / (norm(x1_p) ** 2 + norm(x2_p) ** 2)
+    )  # range of [0, 1]
+
+
+def get_distance_function(distance_type: DistanceFunctionType):
+    match distance_type:
+        case "cosine":
+            return normalized_cosine_distance
+        case "neuclid":
+            return normalized_squared_euclidean_distance
+        case _:
+            raise ValueError(
+                f"Distance function {distance_type} not recognized."
+            )
