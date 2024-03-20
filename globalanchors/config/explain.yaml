@@ -10,5 +10,3 @@ defaults:
   - model: svm
   - local: anchors
   - combined: submodular
-
-task_name: "explain"

@@ -1,5 +1,5 @@
 _target_: globalanchors.local.anchors.TextAnchors
-sampler: genetic
+sampler: unk
 confidence_threshold: 0.95
 epsilon: 0.1
 delta: 0.05
