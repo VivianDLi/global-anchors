@@ -1,7 +1,7 @@
 """Implementations of SVM, RF, and NN using scikit-learn."""
 
-from abc import ABC, abstractmethod
-from typing import List, override
+from abc import ABC
+from typing import List
 
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer

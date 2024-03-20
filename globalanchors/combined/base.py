@@ -10,9 +10,8 @@ from globalanchors.types import ExplainerOutput, Model
 
 
 class GlobalAnchors(ABC):
-    def __init__(self, explainer: TextAnchors, data: List[str]):
-        self.explainer = explainer
-        self.data = data
+    def __init__(self, num_rules: int = 5):
+        self.num_rules = num_rules
         self.explanation_cache = {}
 
     @abstractmethod
@@ -27,17 +26,27 @@ class GlobalAnchors(ABC):
         """
         return NotImplementedError
 
-    def explain(
-        self, example: Union[str, bytes], model: Model, **kwargs
-    ) -> List[ExplainerOutput]:
+    def train(
+        self, explainer: TextAnchors, data: List[str], model: Model
+    ) -> None:
+        """Train the global explainer on a dataset and local explainer.
+
+        Args:
+            explainer (TextAnchors): Local explainer to use.
+            data (List[str]): Training data to use.
+        """
+        self.explanation_cache = {}
+        self.explainer = explainer
+        self.data = data
+        self.model = model
+
+    def explain(self, example: Union[str, bytes]) -> List[ExplainerOutput]:
         """Return all global explanations satisfying a textual example for a given model.
 
         Args:
             example (str): Textual example to generate explanations for.
             model (Model): ML Model to explain.
         """
-        # reset explanation cache for new model
-        self.explanation_cache = {}
         # optionally decode a byte input
         if type(example) == bytes:
             logger.debug("Decoding byte string example.")
@@ -46,7 +55,7 @@ class GlobalAnchors(ABC):
             type(example) == str
         ), f"Explainer input must be either a string or a byte array. Input was instead a {type(example)}."
         # generate global rules for this model
-        rules = self.combine_rules(model)
+        rules = self.combine_rules()
         # find valid rules for this example
         return [
             expl

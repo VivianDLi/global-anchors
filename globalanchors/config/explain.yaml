@@ -1,0 +1,14 @@
+# @package _global_
+
+# config parameters
+name: "" # default name for the experiment, "" means wandb will generate a unique name
+seed: 42 # seed for random number generator
+
+# defaults
+defaults:
+  - dataloader: polarity
+  - model: svm
+  - local: anchors
+  - combined: submodular
+
+task_name: "explain"

@@ -3,21 +3,17 @@ from typing import List, override
 from loguru import logger
 
 from globalanchors.combined.base import GlobalAnchors
-from globalanchors.local.anchors import TextAnchors
-from globalanchors.types import ExplainerOutput, Model
+from globalanchors.types import ExplainerOutput
 
 
 class SubmodularPick(GlobalAnchors):
     """Implements submodular pick for selecting rule subset (i.e., greedy set cover)."""
 
-    def __init__(
-        self, explainer: TextAnchors, data: List[str], num_rules: int = 5
-    ):
-        self.num_rules = num_rules
-        super().__init__(explainer, data)
+    def __init__(self, num_rules: int = 5):
+        super().__init__(num_rules)
 
     @override
-    def combine_rules(self, model: Model) -> List[ExplainerOutput]:
+    def combine_rules(self) -> List[ExplainerOutput]:
         # generate explanations
         explanations = []
         for text in self.data:
@@ -25,7 +21,7 @@ class SubmodularPick(GlobalAnchors):
             if text in self.explaination_cache:
                 explanations.append(self.explaination_cache[text])
             else:
-                expl = self.explainer.explain(text, model)
+                expl = self.explainer.explain(text, self.model)
                 self.explaination_cache[text] = expl
                 explanations.append(expl)
         # calculate explanation coverage

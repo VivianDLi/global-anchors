@@ -1,0 +1,3 @@
+_target_: globalanchors.local.neighbourhood.pos.PartOfSpeechSampler
+use_generator_probabilities: False
+one_pass: False

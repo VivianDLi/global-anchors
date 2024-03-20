@@ -1,0 +1,3 @@
+_target_: globalanchors.local.neighbourhood.unk.UnkTokenSampler
+use_generator_probabilities: False
+mask_string: UNK
