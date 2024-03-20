@@ -193,6 +193,10 @@ class ExplainerOutput(TypedDict):
     prediction: int
 
 
+class GlobalExplainerOutput(TypedDict):
+    explanations: List[ExplainerOutput]
+
+
 ## Genetic Algorithm Types
 
 DistanceFunctionType = Literal["cosine", "neuclid"]
