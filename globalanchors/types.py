@@ -11,6 +11,7 @@ from typing import (
     Set,
     Tuple,
     TypedDict,
+    Union,
 )
 import numpy as np
 import spacy
@@ -35,6 +36,27 @@ class Dataset(TypedDict):
     val_labels: List[int]
     test_data: List[str]
     test_labels: List[int]
+
+
+class LocalMetrics(TypedDict):
+    rule_length: float
+    coverage: float
+    precision: float
+    f1: float
+    num_samples: float
+    time_taken: float
+
+
+class GlobalMetrics(TypedDict):
+    # statistics for generated global ruleset
+    global_rule_length: float
+    global_rule_coverage: float
+    global_rule_precision: float
+    global_rule_f1: float
+    # statistics for predicting on dataset
+    average_valid_rules: float
+    rule_length: float
+    accuracy: float
 
 
 ## Anchors Types
@@ -205,10 +227,14 @@ class ExplainerOutput(TypedDict):
     precision: float
     coverage: float
     prediction: int
+    num_samples: int
 
 
 class GlobalExplainerOutput(TypedDict):
+    example: str
     explanations: List[ExplainerOutput]
+    rule_used: Union[ExplainerOutput | None]
+    prediction: int
 
 
 ## Genetic Algorithm Types

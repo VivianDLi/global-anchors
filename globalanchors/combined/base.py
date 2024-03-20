@@ -7,13 +7,16 @@ from loguru import logger
 import numpy as np
 
 from globalanchors.local.anchors import TextAnchors
-from globalanchors.types import ExplainerOutput, Model
+from globalanchors.types import ExplainerOutput, GlobalExplainerOutput, Model
 
 
 class GlobalAnchors(ABC):
     def __init__(self, num_rules: int = 5):
         self.num_rules = num_rules
         self.explanation_cache = {}
+        self.data = None
+        self.model = None
+        self.rules = None
 
     @abstractmethod
     def combine_rules(self) -> List[ExplainerOutput]:
@@ -40,8 +43,9 @@ class GlobalAnchors(ABC):
         self.explainer = explainer
         self.data = data
         self.model = model
+        self.rules = self.combine_rules()
 
-    def explain(self, example: Union[str, bytes]) -> List[ExplainerOutput]:
+    def explain(self, example: Union[str, bytes]) -> GlobalExplainerOutput:
         """Return all global explanations satisfying a textual example for a given model.
 
         Args:
@@ -55,37 +59,28 @@ class GlobalAnchors(ABC):
         assert (
             type(example) == str
         ), f"Explainer input must be either a string or a byte array. Input was instead a {type(example)}."
-        # generate global rules for this model
-        rules = self.combine_rules()
+        # check that explainer has been trained
+        assert (
+            self.rules is not None
+        ), "Explainer must be trained with <explainer.train()> before explaining."
         # find valid rules for this example
-        return [
+        valid_explanations = [
             expl
-            for expl in rules
+            for expl in self.rules
             if all([feat in example for feat in expl["feats"]])
         ]
-
-    def predict(self, example: Union[str, bytes]) -> int:
-        """Predict the class of an example using the model.
-
-        Args:
-            example (Union[str, bytes]): Example to predict the class of.
-
-        Returns:
-            int: Predicted class of the example.
-        """
-        if type(example) == bytes:
-            logger.debug("Decoding byte string example.")
-            example = example.decode()
-        assert (
-            type(example) == str
-        ), f"Predict input must be either a string or a byte array. Input was instead a {type(example)}."
-        # find valid global rules
-        valid_explanations = self.explain(example)
         # predict using the model
         if len(valid_explanations) == 0:
             # randomly predict
-            return np.random.choice(2)
-        # choose the valid rule with the highest precision (i.e., accuracy)
-        return max(valid_explanations, key=lambda x: x["precision"])[
-            "prediction"
-        ]
+            prediction = np.random.choice(2)
+            used_rule = None
+        else:
+            # choose the valid rule with the highest precision (i.e., accuracy)
+            used_rule = max(valid_explanations, key=lambda x: x["precision"])
+            prediction = used_rule["prediction"]
+        return {
+            "example": example,
+            "explanations": valid_explanations,
+            "rule_used": used_rule,
+            "prediction": prediction,
+        }
