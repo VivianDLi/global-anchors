@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import List, Union
 
 from loguru import logger
+import numpy as np
 
 from globalanchors.local.anchors import TextAnchors
 from globalanchors.types import ExplainerOutput, Model
@@ -15,7 +16,7 @@ class GlobalAnchors(ABC):
         self.explanation_cache = {}
 
     @abstractmethod
-    def combine_rules(self, model: Model) -> List[ExplainerOutput]:
+    def combine_rules(self) -> List[ExplainerOutput]:
         """Generates a subset of global rules for a model from a set of local rules created by running an explainer on a dataset.
 
         Args:
@@ -60,5 +61,31 @@ class GlobalAnchors(ABC):
         return [
             expl
             for expl in rules
-            if all([feat in example for feat in expl.feats])
+            if all([feat in example for feat in expl["feats"]])
+        ]
+
+    def predict(self, example: Union[str, bytes]) -> int:
+        """Predict the class of an example using the model.
+
+        Args:
+            example (Union[str, bytes]): Example to predict the class of.
+
+        Returns:
+            int: Predicted class of the example.
+        """
+        if type(example) == bytes:
+            logger.debug("Decoding byte string example.")
+            example = example.decode()
+        assert (
+            type(example) == str
+        ), f"Predict input must be either a string or a byte array. Input was instead a {type(example)}."
+        # find valid global rules
+        valid_explanations = self.explain(example)
+        # predict using the model
+        if len(valid_explanations) == 0:
+            # randomly predict
+            return np.random.choice(2)
+        # choose the valid rule with the highest precision (i.e., accuracy)
+        return max(valid_explanations, key=lambda x: x["precision"])[
+            "prediction"
         ]

@@ -18,11 +18,11 @@ class SubmodularPick(GlobalAnchors):
         explanations = []
         for text in self.data:
             # check for cached output
-            if text in self.explaination_cache:
-                explanations.append(self.explaination_cache[text])
+            if text in self.explanation_cache:
+                explanations.append(self.explanation_cache[text])
             else:
                 expl = self.explainer.explain(text, self.model)
-                self.explaination_cache[text] = expl
+                self.explanation_cache[text] = expl
                 explanations.append(expl)
         # calculate explanation coverage
         covered = {}
@@ -31,8 +31,8 @@ class SubmodularPick(GlobalAnchors):
                 [
                     j
                     for j, text in self.data
-                    if len(expl.explanation) > 0
-                    and all([feat in text for feat in expl.explanation])
+                    if len(expl["explanation"]) > 0
+                    and all([feat in text for feat in expl["explanation"]])
                 ]
             )
         # choose explanations that maximize coverage

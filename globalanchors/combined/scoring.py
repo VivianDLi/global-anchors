@@ -23,7 +23,7 @@ class RuleScoring(GlobalAnchors):
                 [
                     (
                         1
-                        if all([feat in text for feat in expl.explanation])
+                        if all([feat in text for feat in expl["explanation"]])
                         else 0
                     )
                     for text in self.data
@@ -53,11 +53,11 @@ class RuleScoring(GlobalAnchors):
         explanations = []
         for text in self.data:
             # check for cached output
-            if text in self.explaination_cache:
-                explanations.append(self.explaination_cache[text])
+            if text in self.explanation_cache:
+                explanations.append(self.explanation_cache[text])
             else:
                 expl = self.explainer.explain(text, self.model)
-                self.explaination_cache[text] = expl
+                self.explanation_cache[text] = expl
                 explanations.append(expl)
         # calculate scores
         scores = self._rule_relevance_scores(explanations)

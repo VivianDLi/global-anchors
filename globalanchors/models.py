@@ -19,9 +19,9 @@ class BaseModel(ABC):
 
     def train(self, dataset: Dataset):
         train_vectors = self.vectorizer.fit_transform(
-            np.array(dataset.train_data)
+            np.array(dataset["train_data"])
         )
-        train_labels = np.array(dataset.train_labels)
+        train_labels = np.array(dataset["train_labels"])
         self.model.fit(train_vectors, train_labels)
 
     def __call__(self, strings: List[str]) -> List[int]:
