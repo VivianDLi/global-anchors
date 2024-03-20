@@ -20,10 +20,24 @@ from globalanchors.utils import normalize_feature_indices
 
 from loguru import logger
 
+## Training Types
+
 NeighbourhoodSamplerType = Literal["GA", "POS", "UNK"]
 ModelType = Literal["SVM", "RF", "MLP"]
 
 Model = Callable[[List[str]], List[int]]
+
+
+class Dataset(TypedDict):
+    train_data: List[str]
+    train_labels: List[int]
+    val_data: List[str]
+    val_labels: List[int]
+    test_data: List[str]
+    test_labels: List[int]
+
+
+## Anchors Types
 
 
 @dataclass
