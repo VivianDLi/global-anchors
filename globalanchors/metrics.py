@@ -47,13 +47,13 @@ def calculate_local_metrics(
 
         # log intermediate results to wandb
         wandb.log({
-            "test-local-example": data,
-            "test-local-rule-length": rule_lengths[-1],
-            "test-local-coverage": coverages[-1],
-            "test-local-precision": precisions[-1],
-            "test-local-f1": f1_scores[-1],
-            "test-local-num-samples": num_samples[-1],
-            "test-local-time-taken": times[-1],
+            "local-example": data,
+            "local-rule-length": rule_lengths[-1],
+            "local-coverage": coverages[-1],
+            "local-precision": precisions[-1],
+            "local-f1": f1_scores[-1],
+            "local-num-samples": num_samples[-1],
+            "local-time-taken": times[-1],
         })
 
     return {

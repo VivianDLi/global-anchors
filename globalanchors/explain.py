@@ -1,6 +1,7 @@
 """Main module to train, explain, and test a model. This should be the program entry point."""
 
 import hydra
+from sklearn.base import accuracy_score
 import wandb
 import numpy as np
 from loguru import logger
@@ -10,6 +11,10 @@ from globalanchors import constants
 from globalanchors.combined.base import GlobalAnchors
 from globalanchors.datasets import DataLoader
 from globalanchors.local.anchors import TextAnchors
+from globalanchors.metrics import (
+    calculate_local_metrics,
+    calculate_global_metrics,
+)
 from globalanchors.models import BaseModel
 
 
@@ -52,24 +57,100 @@ def explain_model(cfg: DictConfig):
         entity=constants.WANDB_ENTITY,
         config=cfg,
         name="",
-        group="",
     )
 
+    dataset = dataloader.dataset
     logger.info("Starting training!")
-    # TODO: log training results to wandb
+    model.train(dataset)
+    val_accuracy = accuracy_score(
+        dataset["val_labels"], model(dataset["val_data"])
+    )
+    test_accuracy = accuracy_score(
+        dataset["test_labels"], model(dataset["test_data"])
+    )
+    wandb.log(
+        {
+            "model-val-accuracy": val_accuracy,
+            "model-test-accuracy": test_accuracy,
+        }
+    )
 
     logger.info("Generating Local Explanations!")
-    # TODO: log local explanations to wandb
+    train_results = calculate_local_metrics(
+        local_explainer, dataset["train_data"], model
+    )
+    val_results = calculate_local_metrics(
+        local_explainer, dataset["val_data"], model
+    )
+    test_results = calculate_local_metrics(
+        local_explainer, dataset["test_data"], model
+    )
+    wandb.log(
+        {
+            "train-local-rule-length": train_results["rule_length"],
+            "train-local-coverage": train_results["coverage"],
+            "train-local-precision": train_results["precision"],
+            "train-local-f1": train_results["f1"],
+            "train-local-num-samples": train_results["num_samples"],
+            "train-local-time-taken": train_results["time_taken"],
+            "val-local-rule-length": val_results["rule_length"],
+            "val-local-coverage": val_results["coverage"],
+            "val-local-precision": val_results["precision"],
+            "val-local-f1": val_results["f1"],
+            "val-local-num-samples": val_results["num_samples"],
+            "val-local-time-taken": val_results["time_taken"],
+            "test-local-rule-length": test_results["rule_length"],
+            "test-local-coverage": test_results["coverage"],
+            "test-local-precision": test_results["precision"],
+            "test-local-f1": test_results["f1"],
+            "test-local-num-samples": test_results["num_samples"],
+            "test-local-time-taken": test_results["time_taken"],
+        }
+    )
 
-    logger.info("Generating Global Explanations!")
-    # TODO: log global explanations to wandb
-
-    logger.info("Starting testing!")
-    logger.info("Testing Local Explanations!")
-    # TODO: testing local explanations and logging to wandb
-
-    logger.info("Testing Global Explanations!")
-    # TODO: testing global explanations and logging to wandb
+    logger.info("Generating and Testing Global Explanations!")
+    logger.info("Training on train data...")
+    global_explainer.train(local_explainer, dataset["train_data"], model)
+    logger.info("Testing on test data...")
+    global_train_results = calculate_global_metrics(
+        global_explainer, dataset["test_data"]
+    )
+    logger.info("Training on val data...")
+    global_explainer.train(local_explainer, dataset["val_data"], model)
+    logger.info("Testing on test data...")
+    global_val_results = calculate_global_metrics(
+        global_explainer, dataset["test_data"]
+    )
+    logger.info("Training on test data...")
+    global_explainer.train(local_explainer, dataset["test_data"], model)
+    logger.info("Testing on test data...")
+    global_test_results = calculate_global_metrics(
+        global_explainer, dataset["test_data"]
+    )
+    wandb.log({
+        "train-global-rule-length": global_train_results["global_rule_length"],
+        "train-global-rule-coverage": global_train_results["global_rule_coverage"],
+        "train-global-rule-precision": global_train_results["global_rule_precision"],
+        "train-global-rule-f1": global_train_results["global_rule_f1"],
+        "train-average-valid-rules": global_train_results["average_valid_rules"],
+        "train-rule-length": global_train_results["rule_length"],
+        "train-accuracy": global_train_results["accuracy"],
+        "val-global-rule-length": global_val_results["global_rule_length"],
+        "val-global-rule-coverage": global_val_results["global_rule_coverage"],
+        "val-global-rule-precision": global_val_results["global_rule_precision"],
+        "val-global-rule-f1": global_val_results["global_rule_f1"],
+        "val-average-valid-rules": global_val_results["average_valid_rules"],
+        "val-rule-length": global_val_results["rule_length"],
+        "val-accuracy": global_val_results["accuracy"],
+        "test-global-rule-length": global_test_results["global_rule_length"],
+        "test-global-rule-coverage": global_test_results["global_rule_coverage"],
+        "test-global-rule-precision": global_test_results["global_rule_precision"],
+        "test-global-rule-f1": global_test_results["global_rule_f1"],
+        "test-average-valid-rules": global_test_results["average_valid_rules"],
+        "test-rule-length": global_test_results["rule_length"],
+        "test-accuracy": global_test_results["accuracy"],
+    })
+    logger.info("Completed Tests!")
 
 
 # Load hydra config from yaml files and command line arguments.
