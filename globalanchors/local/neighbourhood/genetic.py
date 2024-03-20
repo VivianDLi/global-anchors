@@ -71,10 +71,10 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         example_text = " ".join(example.tokens)
         if same_label:
             # indicator for matching labels
-            label_score = 1 if model([indv_text]) == example.label else 0
+            label_score = 1 if model([indv_text])[0] == example.label else 0
         else:
             # indicator for mismatched labels
-            label_score = 1 if model([indv_text]) != example.label else 0
+            label_score = 1 if model([indv_text])[0] != example.label else 0
         # distance between embeddings
         dist_score = self.distance_function(
             self._encode(indv_text), self._encode(example_text)

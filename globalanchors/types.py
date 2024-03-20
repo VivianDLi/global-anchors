@@ -39,7 +39,7 @@ class InputData:
         processed = self.nlp(text)
         self.tokens = np.array([x.text for x in processed], dtype="|U80")
         self.positions = np.array([x.idx for x in processed])
-        self.label = model([text])
+        self.label = model([text])[0]
 
 
 @dataclass
