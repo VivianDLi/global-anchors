@@ -1,0 +1,30 @@
+program: explain.py
+method: grid
+name: all_sweep
+metric: # does not matter, as used to run experiments
+  goal: minimize
+  name: global/test/accuracy
+
+parameters:
+  dataloader:
+    values: [polarity, subjectivity]
+
+  model:
+    values: [svm, rf, nn]
+
+  local.sampler:
+    values: [genetic, pos, unk]
+
+  combined:
+    values: [submodular, scoring]
+
+  name:
+    value: ${dataloader}_${model}_${local.sampler}_${combined}
+  
+command:
+  - ${env}
+  - HYDRA_FULL_ERROR=1
+  - WANDB_START_METHOD=thread
+  - python
+  - ${program}
+  - ${args_no_hyphens}

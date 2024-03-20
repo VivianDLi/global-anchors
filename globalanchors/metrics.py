@@ -47,13 +47,13 @@ def calculate_local_metrics(
 
         # log intermediate results to wandb
         wandb.log({
-            "local-example": data,
-            "local-rule-length": rule_lengths[-1],
-            "local-coverage": coverages[-1],
-            "local-precision": precisions[-1],
-            "local-f1": f1_scores[-1],
-            "local-num-samples": num_samples[-1],
-            "local-time-taken": times[-1],
+            "local/intermediate/example": data,
+            "local/intermediate/rule-length": rule_lengths[-1],
+            "local/intermediate/coverage": coverages[-1],
+            "local/intermediate/precision": precisions[-1],
+            "local/intermediate/f1": f1_scores[-1],
+            "local/intermediate/num-samples": num_samples[-1],
+            "local/intermediate/time-taken": times[-1],
         })
 
     return {
@@ -107,8 +107,8 @@ def calculate_global_metrics(
         accuracies.append(1 if output["prediction"] == explainer.model([data])[0] else 0)
         # log intermediate results to wandb
         wandb.log({
-            "test-global-example": data,
-            "test-global-num-valid-rules": num_rules[-1]
+            "global/intermediate/example": data,
+            "global/intermediate/num-valid-rules": num_rules[-1]
         })
     
     return {

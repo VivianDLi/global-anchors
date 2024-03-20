@@ -87,24 +87,24 @@ def explain_model(cfg: DictConfig):
     )
     wandb.log(
         {
-            "train-local-rule-length": train_results["rule_length"],
-            "train-local-coverage": train_results["coverage"],
-            "train-local-precision": train_results["precision"],
-            "train-local-f1": train_results["f1"],
-            "train-local-num-samples": train_results["num_samples"],
-            "train-local-time-taken": train_results["time_taken"],
-            "val-local-rule-length": val_results["rule_length"],
-            "val-local-coverage": val_results["coverage"],
-            "val-local-precision": val_results["precision"],
-            "val-local-f1": val_results["f1"],
-            "val-local-num-samples": val_results["num_samples"],
-            "val-local-time-taken": val_results["time_taken"],
-            "test-local-rule-length": test_results["rule_length"],
-            "test-local-coverage": test_results["coverage"],
-            "test-local-precision": test_results["precision"],
-            "test-local-f1": test_results["f1"],
-            "test-local-num-samples": test_results["num_samples"],
-            "test-local-time-taken": test_results["time_taken"],
+            "local/train/rule-length": train_results["rule_length"],
+            "local/train/coverage": train_results["coverage"],
+            "local/train/precision": train_results["precision"],
+            "local/train/f1": train_results["f1"],
+            "local/train/num-samples": train_results["num_samples"],
+            "local/train/time-taken": train_results["time_taken"],
+            "local/val/rule-length": val_results["rule_length"],
+            "local/val/coverage": val_results["coverage"],
+            "local/val/precision": val_results["precision"],
+            "local/val/f1": val_results["f1"],
+            "local/val/num-samples": val_results["num_samples"],
+            "local/val/time-taken": val_results["time_taken"],
+            "local/test/rule-length": test_results["rule_length"],
+            "local/test/coverage": test_results["coverage"],
+            "local/test/precision": test_results["precision"],
+            "local/test/f1": test_results["f1"],
+            "local/test/num-samples": test_results["num_samples"],
+            "local/test/time-taken": test_results["time_taken"],
         }
     )
 
@@ -127,29 +127,59 @@ def explain_model(cfg: DictConfig):
     global_test_results = calculate_global_metrics(
         global_explainer, dataset["test_data"]
     )
-    wandb.log({
-        "train-global-rule-length": global_train_results["global_rule_length"],
-        "train-global-rule-coverage": global_train_results["global_rule_coverage"],
-        "train-global-rule-precision": global_train_results["global_rule_precision"],
-        "train-global-rule-f1": global_train_results["global_rule_f1"],
-        "train-average-valid-rules": global_train_results["average_valid_rules"],
-        "train-rule-length": global_train_results["rule_length"],
-        "train-accuracy": global_train_results["accuracy"],
-        "val-global-rule-length": global_val_results["global_rule_length"],
-        "val-global-rule-coverage": global_val_results["global_rule_coverage"],
-        "val-global-rule-precision": global_val_results["global_rule_precision"],
-        "val-global-rule-f1": global_val_results["global_rule_f1"],
-        "val-average-valid-rules": global_val_results["average_valid_rules"],
-        "val-rule-length": global_val_results["rule_length"],
-        "val-accuracy": global_val_results["accuracy"],
-        "test-global-rule-length": global_test_results["global_rule_length"],
-        "test-global-rule-coverage": global_test_results["global_rule_coverage"],
-        "test-global-rule-precision": global_test_results["global_rule_precision"],
-        "test-global-rule-f1": global_test_results["global_rule_f1"],
-        "test-average-valid-rules": global_test_results["average_valid_rules"],
-        "test-rule-length": global_test_results["rule_length"],
-        "test-accuracy": global_test_results["accuracy"],
-    })
+    wandb.log(
+        {
+            "global/train/global-rule-length": global_train_results[
+                "global_rule_length"
+            ],
+            "global/train/global-rule-coverage": global_train_results[
+                "global_rule_coverage"
+            ],
+            "global/train/global-rule-precision": global_train_results[
+                "global_rule_precision"
+            ],
+            "global/train/global-rule-f1": global_train_results[
+                "global_rule_f1"
+            ],
+            "global/train/average-valid-rules": global_train_results[
+                "average_valid_rules"
+            ],
+            "global/train/rule-length": global_train_results["rule_length"],
+            "global/train/accuracy": global_train_results["accuracy"],
+            "global/val/global-rule-length": global_val_results[
+                "global_rule_length"
+            ],
+            "global/val/global-rule-coverage": global_val_results[
+                "global_rule_coverage"
+            ],
+            "global/val/global-rule-precision": global_val_results[
+                "global_rule_precision"
+            ],
+            "global/val/global-rule-f1": global_val_results["global_rule_f1"],
+            "global/val/average-valid-rules": global_val_results[
+                "average_valid_rules"
+            ],
+            "global/val/rule-length": global_val_results["rule_length"],
+            "global/val/accuracy": global_val_results["accuracy"],
+            "global/test/global-rule-length": global_test_results[
+                "global_rule_length"
+            ],
+            "global/test/global-rule-coverage": global_test_results[
+                "global_rule_coverage"
+            ],
+            "global/test/global-rule-precision": global_test_results[
+                "global_rule_precision"
+            ],
+            "global/test/global-rule-f1": global_test_results[
+                "global_rule_f1"
+            ],
+            "global/test/average-valid-rules": global_test_results[
+                "average_valid_rules"
+            ],
+            "global/test/rule-length": global_test_results["rule_length"],
+            "global/test/accuracy": global_test_results["accuracy"],
+        }
+    )
     logger.info("Completed Tests!")
 
 
