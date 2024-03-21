@@ -93,6 +93,9 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
             if len(required_features) > 0
             else 1
         )
+        # logger.debug(
+        #     f"Distance for indv {indv_text} on example {example_text}: {dist_score}."
+        # )
         return label_score + (1 - dist_score) + features_score - example_score
 
     def _select(
@@ -126,6 +129,7 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
             new_gene[crossover_points[0] : crossover_points[1]] = gene2[
                 crossover_points[0] : crossover_points[1]
             ]
+            logger.debug(new_gene)
             children.append(Individual(new_gene, 0))
         return children
 
@@ -193,6 +197,13 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         Returns:
             Tuple[np.ndarray, List[str]]: _description_
         """
+        if num_samples == 1:
+            # generate a single sample
+            population = Population(example, 1)
+            data, string_data = self._genetic_algorithm(
+                population, True, required_features, example, model
+            )
+            return data, string_data
         # initialize population from example and evaluate preliminary fitnesses
         different_population = Population(example, num_samples // 2)
         matching_population = Population(

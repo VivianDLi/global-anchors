@@ -72,9 +72,7 @@ class NeighbourhoodSampler(ABC):
         # check for cached output for consistency + optimization
         if masked_text in self.bert_cache:
             return self.bert_cache[masked_text]
-        encoded_input = self.bert_tokenizer.encode(
-            masked_text, add_special_tokens=True
-        )
+        encoded_input = self.bert_tokenizer.encode(masked_text)
         masked_inputs = (
             (torch.tensor(encoded_input) == self.bert_tokenizer.mask_token_id)
             .numpy()
@@ -87,7 +85,7 @@ class NeighbourhoodSampler(ABC):
         generated_words = []
         for i in masked_inputs:
             probs, top_words = torch.topk(
-                output[0, i], 500
+                output[0, i], 100
             )  # top 500 generated words
             words = self.bert_tokenizer.convert_ids_to_tokens(top_words)
             probs = np.array([float(prob) for prob in probs])

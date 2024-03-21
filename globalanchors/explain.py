@@ -87,10 +87,11 @@ def explain_model(cfg: DictConfig):
         }
     )
 
+    logger.info("Getting small subset for compute...")
+    data = dataset["val_data"][:100]
+
     logger.info("Generating Local Explanations!")
-    local_results = calculate_local_metrics(
-        local_explainer, dataset["val_data"]
-    )
+    local_results = calculate_local_metrics(local_explainer, data)
     wandb.log(
         {
             "local/rule-length": local_results["rule_length"],
@@ -104,7 +105,7 @@ def explain_model(cfg: DictConfig):
 
     logger.info("Generating and Testing Global Explanations!")
     logger.info("Training on val data...")
-    global_explainer.train(local_explainer, dataset["val_data"])
+    global_explainer.train(local_explainer, data)
     logger.info("Testing on test data...")
     global_val_results = calculate_global_metrics(
         global_explainer, dataset["test_data"]

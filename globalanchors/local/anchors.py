@@ -179,7 +179,9 @@ class TextAnchors:
         n_positives = np.array([cand.num_positives for cand in candidates])
         upper_bounds = np.zeros(n_features)
         lower_bounds = np.zeros(n_features)
-        top_n = min(n_features, self.beam_size)
+        top_n = min(
+            n_features - 1, self.beam_size
+        )  # handle top_n = len(sorted_means)
         # check candidates without samples, and generate samples
         for i in np.where(n_samples == 0)[0]:
             candidates[i], state = self.sampler.sample_candidate_with_state(
