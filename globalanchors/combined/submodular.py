@@ -3,7 +3,7 @@ from typing import List
 from loguru import logger
 
 from globalanchors.combined.base import GlobalAnchors
-from globalanchors.types import ExplainerOutput
+from globalanchors.anchor_types import ExplainerOutput
 
 
 class SubmodularPick(GlobalAnchors):
@@ -15,16 +15,18 @@ class SubmodularPick(GlobalAnchors):
     # override
     def combine_rules(self) -> List[ExplainerOutput]:
         # generate explanations
+        logger.info("Generating explanations...")
         explanations = []
         for text in self.data:
             # check for cached output
             if text in self.explanation_cache:
                 explanations.append(self.explanation_cache[text])
             else:
-                expl = self.explainer.explain(text, self.model)
+                expl = self.explainer.explain(text)
                 self.explanation_cache[text] = expl
                 explanations.append(expl)
         # calculate explanation coverage
+        logger.info("Calculating explanation coverage...")
         covered = {}
         for i, expl in enumerate(explanations):
             covered[i] = set(
@@ -36,6 +38,7 @@ class SubmodularPick(GlobalAnchors):
                 ]
             )
         # choose explanations that maximize coverage
+        logger.info("Choosing explanations...")
         chosen = []
         current_covered = set()
         for i in range(self.num_rules):

@@ -2,6 +2,7 @@
 
 # config parameters
 name: "" # default name for the experiment, "" means wandb will generate a unique name
+group: "all_runs"
 seed: 42 # seed for random number generator
 
 # defaults
@@ -11,3 +12,4 @@ defaults:
   - local: anchors
   - sampler: unk
   - combined: submodular
+  - _self_

@@ -6,7 +6,7 @@ from globalanchors.metrics import (
     calculate_local_metrics,
     calculate_global_metrics,
 )
-from globalanchors.types import LocalMetrics, GlobalMetrics
+from globalanchors.anchor_types import LocalMetrics, GlobalMetrics
 
 GLOBAL_CONFIG_FILE = (
     constants.HYDRA_CONFIG_PATH / "combined" / "submodular.yaml"
@@ -20,12 +20,12 @@ def test_local_metrics():
     # initialize test data
     test_explainer = instantiate(omegaconf.OmegaConf.load(LOCAL_CONFIG_FILE))
     test_sampler = instantiate(omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE))
-    test_explainer.set_sampler(test_sampler)
+    test_model = lambda x: [1 for _ in x]
+    test_explainer.set_functions(test_sampler, test_model)
     test_dataset = [
         "This is a test sentence.",
         "This is another test sentence.",
     ]
-    test_model = lambda x: [1 for _ in x]
     expected_keys = set(
         [
             "rule_length",
@@ -53,13 +53,13 @@ def test_global_metrics():
     # initialize test data
     local_explainer = instantiate(omegaconf.OmegaConf.load(LOCAL_CONFIG_FILE))
     test_sampler = instantiate(omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE))
-    local_explainer.set_sampler(test_sampler)
+    test_model = lambda x: [1 for _ in x]
+    test_explainer.set_functions(test_sampler, test_model)
     test_explainer = instantiate(omegaconf.OmegaConf.load(GLOBAL_CONFIG_FILE))
     test_dataset = [
         "This is a test sentence.",
         "This is another test sentence.",
     ]
-    test_model = lambda x: [1 for _ in x]
     test_explainer.train(local_explainer, test_dataset, test_model)
     expected_keys = set(
         [

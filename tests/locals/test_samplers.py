@@ -7,7 +7,7 @@ from loguru import logger
 
 from globalanchors import constants
 from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
-from globalanchors.types import (
+from globalanchors.anchor_types import (
     BeamState,
     CandidateAnchor,
     InputData,

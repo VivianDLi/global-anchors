@@ -3,18 +3,17 @@
 from typing import List
 from timeit import default_timer as timer
 
-from tqdm import tqdm
+from loguru import logger
 import wandb
 
 from globalanchors.combined.base import GlobalAnchors
 from globalanchors.local.anchors import TextAnchors
-from globalanchors.types import GlobalMetrics, LocalMetrics, Model
+from globalanchors.anchor_types import GlobalMetrics, LocalMetrics, Model
 
 
 def calculate_local_metrics(
     explainer: TextAnchors,
     dataset: List[str],
-    model: Model,
     log_to_wandb: bool = True,
 ) -> LocalMetrics:
     """Calculates local metrics for a given dataset.
@@ -32,10 +31,11 @@ def calculate_local_metrics(
     f1_scores = []
     num_samples = []
     times = []
-    for data in tqdm(dataset):
+    for i, data in enumerate(dataset):
+        logger.info(f"Explaining example {data} ({i} / {len(dataset)})...")
         # time explanation
         start = timer()
-        explanation = explainer.explain(data, model)
+        explanation = explainer.explain(data)
         end = timer()
         # log results
         times.append(end - start)
@@ -121,7 +121,9 @@ def calculate_global_metrics(
     num_rules = []
     rule_lengths = []
     accuracies = []
-    for data in tqdm(dataset):
+    covered = []
+    for i, data in enumerate(dataset):
+        logger.info(f"Explaining example {data} ({i} / {len(dataset)})...")
         output = explainer.explain(data)
         num_rules.append(len(output["explanations"]))
         if output["rule_used"] is not None:
@@ -129,6 +131,7 @@ def calculate_global_metrics(
         accuracies.append(
             1 if output["prediction"] == explainer.model([data])[0] else 0
         )
+        covered.append(1 if len(output["explanations"]) > 0 else 0)
         # log intermediate results to wandb
         if log_to_wandb:
             wandb.log(
@@ -146,4 +149,5 @@ def calculate_global_metrics(
         "average_valid_rules": sum(num_rules) / len(num_rules),
         "rule_length": sum(rule_lengths) / len(rule_lengths),
         "accuracy": sum(accuracies) / len(accuracies),
+        "coverage": sum(covered) / len(covered),
     }

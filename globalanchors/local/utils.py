@@ -5,7 +5,7 @@ Taken from the original Anchors paper (https://ojs.aaai.org/index.php/AAAI/artic
 import numpy as np
 from numpy.linalg import norm
 
-from globalanchors.types import DistanceFunctionType
+from globalanchors.anchor_types import DistanceFunctionType
 
 
 def bernoulli_kl(p: float, q: float) -> float:

@@ -8,7 +8,7 @@ from loguru import logger
 from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
 from globalanchors.local.utils import bernoulli_lb, bernoulli_ub, compute_beta
 from globalanchors.utils import normalize_feature_indices
-from globalanchors.types import (
+from globalanchors.anchor_types import (
     InputData,
     CandidateAnchor,
     BeamState,
@@ -47,6 +47,7 @@ class TextAnchors:
             log_interval (int, optional): _description_. Defaults to 5.
         """
         self.sampler = None
+        self.model = None
         self.confidence_threshold = confidence_threshold
         self.epsilon = epsilon
         self.delta = delta
@@ -57,6 +58,8 @@ class TextAnchors:
         self.stop_on_first = stop_on_first
         self.coverage_samples = coverage_samples
         self.log_interval = log_interval
+
+        self.explanation_cache = {}
 
     def _get_candidate_anchors(
         self, past_candidates: List[CandidateAnchor], state: BeamState
@@ -121,7 +124,7 @@ class TextAnchors:
                             state.example.label,
                             0,
                             0,
-                            p_cand.data_idx,
+                            set(),
                             new_coverage_indices,
                         )
                     )
@@ -133,7 +136,12 @@ class TextAnchors:
                 new_num_positives = float(
                     state.neighbourhood.labels[list(new_covered_indices)].sum()
                 )
-                new_precision = new_num_positives / new_num_samples
+                # handle case of no samples
+                new_precision = (
+                    new_num_positives / new_num_samples
+                    if new_num_samples > 0
+                    else 0
+                )
                 # new metadata
                 new_prediction = state.example.label
                 new_candidates.append(
@@ -164,15 +172,18 @@ class TextAnchors:
         """
         # initialize bounds arrays
         n_features = len(candidates)
+        # handle length 1 case
+        if n_features == 1:
+            return [0]
         n_samples = np.array([cand.num_samples for cand in candidates])
         n_positives = np.array([cand.num_positives for cand in candidates])
-        upper_bounds = np.zeros(n_samples.shape)
-        lower_bounds = np.zeros(n_samples.shape)
+        upper_bounds = np.zeros(n_features)
+        lower_bounds = np.zeros(n_features)
         top_n = min(n_features, self.beam_size)
-        # check candidates without samples, and generate a sample
+        # check candidates without samples, and generate samples
         for i in np.where(n_samples == 0)[0]:
             candidates[i], state = self.sampler.sample_candidate_with_state(
-                candidates[i], state
+                candidates[i], state, self.batch_size
             )
             n_samples[i] = candidates[i].num_samples
             n_positives[i] = candidates[i].num_positives
@@ -200,9 +211,9 @@ class TextAnchors:
         diff = upper_bounds[upper_i] - lower_bounds[lower_i]
         while diff > self.epsilon:
             # logging (disabled for tests)
-            if t % self.log_interval:
+            if (t % self.log_interval) == 0:
                 logger.info(
-                    f"\nBest Stats: (i: {lower_i}, mean: {means[lower_i]:.1f}, n: {n_samples[lower_i]}, lb: {lower_bounds[lower_i]:.4f})\nWorst Stats: (i: # {upper_i}, mean: {means[upper_i]:.1f}, n: {n_samples[upper_i]}, lb: {upper_bounds[upper_i]:.4f})\nDiff: {diff:.2f}"
+                    f"\nBest Stats: (i: {lower_i}, mean: {means[lower_i]:.1f}, n: {n_samples[lower_i]}, lb: {lower_bounds[lower_i]:.4f})\nWorst Stats: (i: {upper_i}, mean: {means[upper_i]:.1f}, n: {n_samples[upper_i]}, ub: {upper_bounds[upper_i]:.4f})\nDiff: {diff:.2f}"
                 )
             # generate samples
             candidates[upper_i], state = (
@@ -227,24 +238,31 @@ class TextAnchors:
         sorted_means = np.argsort(means)
         return sorted_means[-top_n:]
 
-    def _beam_search(self, example: str, model: Model) -> CandidateAnchor:
+    def _beam_search(self, example: str) -> CandidateAnchor:
         """Performs beam-search to greedily find the best anchors as explanations.
 
         Args:
             example (str): String of text to generate an explanation for.
-            model (Model): Model to generate explanations for.
 
         Returns:
             CandidateAnchor: Best explanation found for the current model and example.
         """
-        example_data = InputData(example, model)
+        example_data = InputData(example, self.model)
+        logger.info("Generating coverage data...")
         # generate massive amount of data to estimate coverage
         coverage_data = self.sampler.sample(
-            example_data, model, n=self.coverage_samples, compute_labels=False
+            example_data,
+            self.model,
+            n=self.coverage_samples,
+            compute_labels=False,
+            compute_coverage=True,
         ).data
+        logger.info("Initializing beam-search...")
         # generate neighbourhood samples
         neighbourhood = self.sampler.sample(
-            example_data, model, n=max(1, self.min_start_samples)
+            example_data,
+            self.model,
+            n=max(self.batch_size, self.min_start_samples),
         )
         # evaluate lower bound precision of candidates
         mean = neighbourhood.labels.mean()
@@ -257,8 +275,8 @@ class TextAnchors:
         ):
             neighbourhood = self.sampler.sample(
                 example_data,
-                model,
-                n=self.beam_size,
+                self.model,
+                n=self.batch_size,
                 neighbourhood=neighbourhood,
             )
             mean = neighbourhood.labels.mean()
@@ -280,6 +298,7 @@ class TextAnchors:
                 num_samples=neighbourhood.data.shape[0],
             )
         ## enter main beam search loop
+        logger.info("Starting beam-search...")
         # pre-allocate neighbourhood data memory
         neighbourhood.prealloc_size = self.batch_size * 10000
         neighbourhood.reallocate()
@@ -290,12 +309,12 @@ class TextAnchors:
             coverage_data=coverage_data,
             n_features=neighbourhood.data.shape[1],
             example=example_data,
-            model=model,
+            model=self.model,
         )
         state.initialize_features()
         current_size = 1
         best_anchors_per_size: Dict[int, List[CandidateAnchor]] = {0: []}
-        best_coverage = -1
+        best_coverage = 0  # check for 0 coverage
         best_anchor = None
         if self.max_anchor_size is None:
             self.max_anchor_size = neighbourhood.data.shape[1]
@@ -322,7 +341,7 @@ class TextAnchors:
             # add candidates to state dict
             for candidate in best_anchors_per_size[current_size]:
                 state.set_anchor(candidate.feat_indices, candidate)
-            logger.debug(
+            logger.info(
                 f"Best of anchor size {current_size}: {[cand.feats for cand in best_anchors_per_size[current_size]]}"
             )
             # choose beam_size new best candidates based on coverage
@@ -354,7 +373,7 @@ class TextAnchors:
                 ):
                     candidate, state = (
                         self.sampler.sample_candidate_with_state(
-                            candidate, state
+                            candidate, state, self.batch_size
                         )
                     )
                     mean = candidate.num_positives / candidate.num_samples
@@ -365,13 +384,13 @@ class TextAnchors:
                         mean, beta / candidate.num_samples
                     )
                 logger.debug(
-                    f"Mean, LB, UB, and Coverage after updating for the {i}th anchor {candidate.feats}: {mean:0.2f}, {lower_bound:0.2f}, {upper_bound:0.2f}, {coverage:0.2f}."
+                    f"Mean, LB, and UB after updating for the {i}th anchor {candidate.feats}: {mean:0.2f}, {lower_bound:0.2f}, {upper_bound:0.2f}."
                 )
                 if (
                     mean >= self.confidence_threshold
                     and lower_bound > self.confidence_threshold - self.epsilon
                 ):
-                    logger.debug(
+                    logger.info(
                         f"Found eligible anchor {candidate.feats} with coverage {coverage:0.2f} and current max coverage is {best_coverage:0.2f}."
                     )
                     if coverage > best_coverage:
@@ -405,14 +424,12 @@ class TextAnchors:
             best_anchor = all_candidates[candidate_indices[0]]
         return best_anchor
 
-    def set_sampler(self, sampler: NeighbourhoodSampler):
+    def set_functions(self, sampler: NeighbourhoodSampler, model: Model):
         self.sampler = sampler
+        self.model = model
+        self.explanation_cache = {}
 
-    def explain(
-        self,
-        example: Union[str, bytes],
-        model: Model,
-    ) -> ExplainerOutput:
+    def explain(self, example: Union[str, bytes]) -> ExplainerOutput:
         """Creates local explanations for a textual example using Anchors for a given model.
 
         Args:
@@ -420,8 +437,8 @@ class TextAnchors:
             model (Model): ML Model to explain.
         """
         assert (
-            self.sampler is not None
-        ), "Sampler must be set with <set_sampler> before explaining."
+            self.sampler is not None and self.model is not None
+        ), "Sampler and Model must be set with <set_functions> before explaining."
         # optionally decode a byte input
         if type(example) == bytes:
             logger.debug("Decoding byte string example.")
@@ -429,12 +446,18 @@ class TextAnchors:
         assert (
             type(example) == str
         ), f"Explainer input must be either a string or a byte array. Input was instead a {type(example)}."
-        exp = self._beam_search(example, model)
-        return {
-            "example": example,
-            "explanation": exp.feats,
-            "precision": exp.precision,
-            "coverage": exp.coverage,
-            "prediction": exp.prediction,
-            "num_samples": exp.num_samples,
-        }
+        # check for cached explanation
+        if example in self.explanation_cache:
+            return self.explanation_cache[example]
+        else:
+            exp = self._beam_search(example)
+            new_result = {
+                "example": example,
+                "explanation": exp.feats,
+                "precision": exp.precision,
+                "coverage": exp.coverage,
+                "prediction": exp.prediction,
+                "num_samples": exp.num_samples,
+            }
+            self.explanation_cache[example] = new_result
+            return new_result

@@ -39,12 +39,12 @@ def test_train():
         test_sampler = instantiate(
             omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE)
         )
-        test_explainer.set_sampler(test_sampler)
+        test_model = lambda x: [1 for _ in x]
+        test_explainer.set_functions(test_sampler, test_model)
         test_data = [
             "This is a test sentence.",
             "This is another test sentence.",
         ]
-        test_model = lambda x: [1 for _ in x]
         # run tests
         explainer.train(test_explainer, test_data, test_model)
         assert explainer.data == test_data, "Data not set!"
@@ -69,12 +69,12 @@ def test_explain():
         test_sampler = instantiate(
             omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE)
         )
-        test_explainer.set_sampler(test_sampler)
+        test_model = lambda x: [1 for _ in x]
+        test_explainer.set_functions(test_sampler, test_model)
         test_data = [
             "This is a test sentence.",
             "This is another test sentence.",
         ]
-        test_model = lambda x: [1 for _ in x]
         test_example = "This is a test sentence."
         explainer.train(test_explainer, test_data, test_model)
         expected_keys = set(

@@ -8,7 +8,7 @@ import torch
 from loguru import logger
 
 from globalanchors.utils import exp_normalize
-from globalanchors.types import (
+from globalanchors.anchor_types import (
     InputData,
     CandidateAnchor,
     Model,
@@ -122,6 +122,7 @@ class NeighbourhoodSampler(ABC):
         n: int = 1,
         neighbourhood: NeighbourhoodData = None,
         compute_labels: bool = True,
+        compute_coverage: bool = False,
     ) -> NeighbourhoodData:
         """Samples data from the neighbourhood of an example, optionally updating a given neighbourhood.
 
@@ -131,10 +132,19 @@ class NeighbourhoodSampler(ABC):
             n (int, optional): Number of new examples to generate. Defaults to 1.
             neighbourhood (NeighbourhoodData, optional): Optional neighbourhood to add newly generated examples to. Defaults to None.
             compute_labels (bool, optional): Whether to also compute model labels for samples or not. Defaults to True.
+            compute_coverage (bool, optional): Whether to skip word generation for coverage computation. Defaults to False.
 
         Returns:
             NeighbourhoodData: NeighbourhoodData object representing generated samples in the example neighbourhood.
         """
+        # skip rest if only computing coverage
+        if compute_coverage:
+            # always generate coverage data with random probability
+            probabilities = np.ones((n, len(example.tokens))) * 0.5
+            random_sample = np.random.uniform(0, 1, size=probabilities.shape)
+            new_data = (random_sample < probabilities).astype(int)
+            return NeighbourhoodData(None, new_data, None)
+
         ## get new neighbourhood samples
         # calculate replacement probabilities for each feature
         n_features = len(example.tokens)
@@ -159,9 +169,11 @@ class NeighbourhoodSampler(ABC):
         else:
             # randomly select each feature (i.e., probability = 0.5)
             probabilities = np.ones_like(probabilities) * 0.5
+
         # randomly choose either 0 and 1 for each sample/feature depending on probabilities
         random_sample = np.random.uniform(0, 1, size=probabilities.shape)
         new_data = (random_sample < probabilities).astype(int)
+
         new_string_data, new_data, new_labels = self.perturb_samples(
             example, new_data, model, compute_labels=compute_labels
         )

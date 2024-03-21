@@ -23,9 +23,9 @@ def test_explain_null_anchor():
     cfg = omegaconf.OmegaConf.load(LOCAL_CONFIG_FILE)
     explainer = instantiate(cfg)
     sampler = instantiate(omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE))
-    explainer.set_sampler(sampler)
-    # initialize test data
     test_model = lambda x: [1 for _ in x]
+    explainer.set_functions(sampler, test_model)
+    # initialize test data
     test_example = "This is a test sentence."
     expected_keys = set(
         [
@@ -52,9 +52,9 @@ def test_explain_complex_anchor():
     cfg = omegaconf.OmegaConf.load(LOCAL_CONFIG_FILE)
     explainer = instantiate(cfg)
     sampler = instantiate(omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE))
-    explainer.set_sampler(sampler)
-    # initialize test data
     test_model = lambda xs: [1 if "test" in x else 0 for x in xs]
+    explainer.set_functions(sampler, test_model)
+    # initialize test data
     test_example = "This is a test sentence."
     expected_feature = "test"
     expected_keys = set(

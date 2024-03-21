@@ -4,6 +4,7 @@ Contains project-level constants used to configure paths and wandb logging.
 Paths are configured using the `.env` file in the project root.
 """
 
+import logging
 import os
 import pathlib
 from loguru import logger
@@ -52,3 +53,11 @@ HYDRA_CONFIG_PATH = SRC_PATH / "config"
 WANDB_API_KEY = os.environ.get("WANDB_API_KEY")
 WANDB_ENTITY = os.environ.get("WANDB_ENTITY")
 WANDB_PROJECT = os.environ.get("WANDB_PROJECT")
+
+# logging constants
+DEFAULT_LOG_FORMATTER = logging.Formatter(
+    "%(asctime)s %(levelname)s: %(message)s [in %(funcName)s at %(pathname)s:%(lineno)d]"
+)
+DEFAULT_LOG_FILE = PROJECT_PATH / "logs" / "default_log.log"
+DEFAULT_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+DEFAULT_LOG_LEVEL = logging.INFO  # no verbose logging as default

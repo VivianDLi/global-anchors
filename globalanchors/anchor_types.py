@@ -1,6 +1,5 @@
 """Types used in the library."""
 
-from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import (
     Callable,
@@ -53,6 +52,7 @@ class GlobalMetrics(TypedDict):
     average_valid_rules: float
     rule_length: float
     accuracy: float
+    coverage: float
 
 
 ## Anchors Types
@@ -267,7 +267,7 @@ class Individual:
         return self.fitness >= other.fitness
 
     def copy(self) -> "Individual":
-        return deepcopy(self)
+        return Individual(self.gene.copy(), self.fitness)
 
 
 @dataclass
@@ -280,6 +280,7 @@ class Population:
         example: InputData,
         num_samples: int,
     ):
+        assert num_samples > 0, "Population size must be greater than 0."
         # setup initial population
         initial_fitness = 0
         self.individuals = sorted(

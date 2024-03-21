@@ -6,10 +6,11 @@ from pathlib import Path
 import shutil
 import tarfile
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 import wget
 from loguru import logger
 
-from globalanchors.types import Dataset
+from globalanchors.anchor_types import Dataset
 from globalanchors.constants import DATA_PATH
 
 
@@ -28,7 +29,8 @@ class DataLoader(ABC):
         data = []
         labels = []
         f_names = ["0.txt", "1.txt"]
-        for l, f in enumerate(f_names):
+        logger.info("Loading dataset...")
+        for l, f in enumerate(tqdm(f_names)):
             for line in open(self.dataset_path / f, "rb"):
                 try:
                     line.decode("utf-8")

@@ -6,12 +6,12 @@ from typing import Tuple
 import numpy as np
 
 from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
-from globalanchors.types import InputData, Model
+from globalanchors.anchor_types import InputData, Model
 
 
 class PartOfSpeechSampler(NeighbourhoodSampler):
     def __init__(
-        self, use_generator_probabilities: bool = False, one_pass: bool = False
+        self, use_generator_probabilities: bool = False, one_pass: bool = True
     ):
         self.one_pass = one_pass
         super().__init__(

@@ -5,7 +5,7 @@ delta: 0.05
 batch_size: 10
 beam_size: 4
 min_start_samples: 0
-max_anchor_size: null
-stop_on_first: False
+max_anchor_size: 10
+stop_on_first: True
 coverage_samples: 10000
-log_interval: 500
+log_interval: 1000

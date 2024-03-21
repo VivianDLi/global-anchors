@@ -128,6 +128,11 @@ ENV/
 env.bak/
 venv.bak/
 
+# Wandb
+wandb/
+.wandb/
+outputs/
+
 # Spyder project settings
 .spyderproject
 .spyproject

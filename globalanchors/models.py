@@ -9,7 +9,7 @@ from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 
-from globalanchors.types import Dataset
+from globalanchors.anchor_types import Dataset
 
 
 class BaseModel(ABC):

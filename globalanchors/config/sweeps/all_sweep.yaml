@@ -1,4 +1,4 @@
-program: explain.py
+program: globalanchors/explain.py
 method: grid
 name: all_sweep
 metric: # does not matter, as used to run experiments
@@ -12,14 +12,11 @@ parameters:
   model:
     values: [svm, rf, nn]
 
-  local.sampler:
+  sampler:
     values: [genetic, pos, unk]
 
   combined:
     values: [submodular, scoring]
-
-  name:
-    value: ${dataloader}_${model}_${local.sampler}_${combined}
   
 command:
   - ${env}

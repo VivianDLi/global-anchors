@@ -7,7 +7,11 @@ from loguru import logger
 import numpy as np
 
 from globalanchors.local.anchors import TextAnchors
-from globalanchors.types import ExplainerOutput, GlobalExplainerOutput, Model
+from globalanchors.anchor_types import (
+    ExplainerOutput,
+    GlobalExplainerOutput,
+    Model,
+)
 
 
 class GlobalAnchors(ABC):
@@ -30,9 +34,7 @@ class GlobalAnchors(ABC):
         """
         return NotImplementedError
 
-    def train(
-        self, explainer: TextAnchors, data: List[str], model: Model
-    ) -> None:
+    def train(self, explainer: TextAnchors, data: List[str]) -> None:
         """Train the global explainer on a dataset and local explainer.
 
         Args:
@@ -42,7 +44,6 @@ class GlobalAnchors(ABC):
         self.explanation_cache = {}
         self.explainer = explainer
         self.data = data
-        self.model = model
         self.rules = self.combine_rules()
 
     def explain(self, example: Union[str, bytes]) -> GlobalExplainerOutput:

@@ -1,9 +1,10 @@
 from typing import List
 
+from loguru import logger
 import numpy as np
 
 from globalanchors.combined.base import GlobalAnchors
-from globalanchors.types import ExplainerOutput
+from globalanchors.anchor_types import ExplainerOutput
 
 
 class RuleScoring(GlobalAnchors):
@@ -47,19 +48,21 @@ class RuleScoring(GlobalAnchors):
         # combine
         return (coverage_score + rule_coverage_score / 2).tolist()
 
-    #override
+    # override
     def combine_rules(self) -> List[ExplainerOutput]:
         # generate explanations
+        logger.info("Generating explanations...")
         explanations = []
         for text in self.data:
             # check for cached output
             if text in self.explanation_cache:
                 explanations.append(self.explanation_cache[text])
             else:
-                expl = self.explainer.explain(text, self.model)
+                expl = self.explainer.explain(text)
                 self.explanation_cache[text] = expl
                 explanations.append(expl)
         # calculate scores
+        logger.info("Calculating rule relevance scores...")
         scores = self._rule_relevance_scores(explanations)
         # choose explanations with the highest score
         chosen_idx = np.argsort(scores)[-self.num_rules :]

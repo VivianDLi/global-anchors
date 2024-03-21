@@ -9,7 +9,7 @@ import torch
 
 from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
 from globalanchors.local.utils import get_distance_function
-from globalanchors.types import (
+from globalanchors.anchor_types import (
     InputData,
     Model,
     Individual,
@@ -55,7 +55,7 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         )
         model_input = torch.tensor([encoded_input], device=self.device)
         with torch.no_grad():  # for memory optimization
-            encoding = self.bert(model_input)[0][0, 0, :].cpu().numpy()
+            encoding = self.encoder(model_input)[0][0, 0, :].cpu().numpy()
         self.encoder_cache[text] = encoding
         return self.encoder_cache[text]
 

@@ -6,7 +6,7 @@ from typing import Tuple
 import numpy as np
 
 from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
-from globalanchors.types import InputData, Model
+from globalanchors.anchor_types import InputData, Model
 
 
 class UnkTokenSampler(NeighbourhoodSampler):
