@@ -46,10 +46,13 @@ class NeighbourhoodSampler(ABC):
                 "For generator probabilities to be used, generator must be enabled. Setting <use_generator> to True."
             )
         if self.use_generator:
-            from transformers import DistilBertTokenizer, DistilBertForMaskedLM
+            from transformers import (
+                DistilBertTokenizerFast,
+                DistilBertForMaskedLM,
+            )
 
             # import BERT for text generation
-            self.bert_tokenizer = DistilBertTokenizer.from_pretrained(
+            self.bert_tokenizer = DistilBertTokenizerFast.from_pretrained(
                 "distilbert-base-cased"
             )
             self.bert = DistilBertForMaskedLM.from_pretrained(

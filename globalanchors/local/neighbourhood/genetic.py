@@ -4,6 +4,7 @@ Inspired by LORE (https://arxiv.org/pdf/1805.10820.pdf)."""
 
 from functools import partial
 from typing import List, Tuple
+from loguru import logger
 import numpy as np
 import torch
 
@@ -105,7 +106,7 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
             parent1, parent2 = np.random.choice(
                 population.individuals, 2, p=population.probs, replace=False
             )
-            parents.append((parent1.copy(), parent2.copy()))
+            parents.append((parent1, parent2))
         return parents
 
     def _crossover(
@@ -170,7 +171,9 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         # correct data array for matching tokens
         for i, indv in enumerate(population.individuals):
             data[i] = example.tokens == indv.gene
-        return data, [" ".join(indv.gene) for indv in population.individuals]
+        string_data = [" ".join(indv.gene) for indv in population.individuals]
+        logger.debug(f"Generated strings: {string_data}.")
+        return data, string_data
 
     def generate_samples(
         self,

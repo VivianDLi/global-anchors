@@ -13,7 +13,7 @@ class UnkTokenSampler(NeighbourhoodSampler):
     def __init__(
         self,
         use_generator_probabilities: bool = False,
-        mask_string: str = "UNK",
+        mask_string: str = "[UNK]",
     ):
         self.mask_string = mask_string
         super().__init__(

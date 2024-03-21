@@ -298,7 +298,9 @@ class Population:
         for indv in self.individuals:
             indv.fitness = fitness_fn(indv.gene)
         # sort individuals
-        self.individuals = sorted(self.individuals, key=lambda x: x.fitness)
+        self.individuals = sorted(
+            self.individuals, key=lambda x: x.fitness, reverse=True
+        )
         # truncate population
         self.individuals = self.individuals[:population_size]
         fitnesses = [indv.fitness for indv in self.individuals]

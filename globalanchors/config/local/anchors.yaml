@@ -1,6 +1,6 @@
 _target_: globalanchors.local.anchors.TextAnchors
 confidence_threshold: 0.95
-epsilon: 0.1
+epsilon: 0.2
 delta: 0.05
 batch_size: 10
 beam_size: 4
@@ -8,4 +8,4 @@ min_start_samples: 0
 max_anchor_size: 10
 stop_on_first: True
 coverage_samples: 10000
-log_interval: 1000
+log_interval: 1

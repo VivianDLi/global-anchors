@@ -183,7 +183,7 @@ class TextAnchors:
         # check candidates without samples, and generate samples
         for i in np.where(n_samples == 0)[0]:
             candidates[i], state = self.sampler.sample_candidate_with_state(
-                candidates[i], state, self.batch_size
+                candidates[i], state
             )
             n_samples[i] = candidates[i].num_samples
             n_positives[i] = candidates[i].num_positives
@@ -262,7 +262,7 @@ class TextAnchors:
         neighbourhood = self.sampler.sample(
             example_data,
             self.model,
-            n=max(self.batch_size, self.min_start_samples),
+            n=max(1, self.min_start_samples),
         )
         # evaluate lower bound precision of candidates
         mean = neighbourhood.labels.mean()
