@@ -9,4 +9,5 @@ defaults:
   - dataloader: polarity
   - model: svm
   - local: anchors
+  - sampler: unk
   - combined: submodular

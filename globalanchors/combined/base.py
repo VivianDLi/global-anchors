@@ -67,7 +67,7 @@ class GlobalAnchors(ABC):
         valid_explanations = [
             expl
             for expl in self.rules
-            if all([feat in example for feat in expl["feats"]])
+            if all([feat in example for feat in expl["explanation"]])
         ]
         # predict using the model
         if len(valid_explanations) == 0:

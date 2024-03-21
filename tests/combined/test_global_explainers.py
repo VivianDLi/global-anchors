@@ -1,14 +1,15 @@
 import os
 
+from loguru import logger
 import omegaconf
 from hydra.utils import instantiate
 
 from globalanchors import constants
 from globalanchors.combined.base import GlobalAnchors
-from globalanchors.types import GlobalExplainerOutput
 
 GLOBAL_CONFIG_DIR = constants.HYDRA_CONFIG_PATH / "combined"
 LOCAL_CONFIG_FILE = constants.HYDRA_CONFIG_PATH / "local" / "anchors.yaml"
+SAMPLER_CONFIG_FILE = constants.HYDRA_CONFIG_PATH / "sampler" / "unk.yaml"
 
 
 def test_instantiate_global():
@@ -26,6 +27,7 @@ def test_instantiate_global():
 def test_train():
     """Test train function runs."""
     for t in os.listdir(GLOBAL_CONFIG_DIR):
+        logger.info("Testing combiner: {t}")
         config_path = GLOBAL_CONFIG_DIR / t
         cfg = omegaconf.OmegaConf.load(config_path)
 
@@ -34,6 +36,10 @@ def test_train():
         test_explainer = instantiate(
             omegaconf.OmegaConf.load(LOCAL_CONFIG_FILE)
         )
+        test_sampler = instantiate(
+            omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE)
+        )
+        test_explainer.set_sampler(test_sampler)
         test_data = [
             "This is a test sentence.",
             "This is another test sentence.",
@@ -51,6 +57,7 @@ def test_train():
 def test_explain():
     """Test explain function runs."""
     for t in os.listdir(GLOBAL_CONFIG_DIR):
+        logger.info("Testing combiner: {t}")
         config_path = GLOBAL_CONFIG_DIR / t
         cfg = omegaconf.OmegaConf.load(config_path)
 
@@ -59,6 +66,10 @@ def test_explain():
         test_explainer = instantiate(
             omegaconf.OmegaConf.load(LOCAL_CONFIG_FILE)
         )
+        test_sampler = instantiate(
+            omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE)
+        )
+        test_explainer.set_sampler(test_sampler)
         test_data = [
             "This is a test sentence.",
             "This is another test sentence.",
@@ -66,9 +77,14 @@ def test_explain():
         test_model = lambda x: [1 for _ in x]
         test_example = "This is a test sentence."
         explainer.train(test_explainer, test_data, test_model)
+        expected_keys = set(
+            ["example", "explanations", "rule_used", "prediction"]
+        )
         # run tests
-        explanations = explainer.explain(test_example)
-        assert explanations, "Explanations not returned!"
-        assert isinstance(
-            explanations, GlobalExplainerOutput
-        ), f"Expected GlobalExplainerOutput, got {type(explanations)}."
+        explanation = explainer.explain(test_example)
+        assert explanation, "Explanations not returned!"
+
+        current_keys = set(explanation.keys())
+        assert (
+            current_keys == expected_keys
+        ), f"Output for explainer {cfg} is missing keys {expected_keys - current_keys}."

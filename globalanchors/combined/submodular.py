@@ -1,4 +1,4 @@
-from typing import List, override
+from typing import List
 
 from loguru import logger
 
@@ -12,7 +12,7 @@ class SubmodularPick(GlobalAnchors):
     def __init__(self, num_rules: int = 5):
         super().__init__(num_rules)
 
-    @override
+    # override
     def combine_rules(self) -> List[ExplainerOutput]:
         # generate explanations
         explanations = []
@@ -26,11 +26,11 @@ class SubmodularPick(GlobalAnchors):
                 explanations.append(expl)
         # calculate explanation coverage
         covered = {}
-        for i, expl in explanations:
+        for i, expl in enumerate(explanations):
             covered[i] = set(
                 [
                     j
-                    for j, text in self.data
+                    for j, text in enumerate(self.data)
                     if len(expl["explanation"]) > 0
                     and all([feat in text for feat in expl["explanation"]])
                 ]
@@ -44,7 +44,7 @@ class SubmodularPick(GlobalAnchors):
                 gain = len(current_covered.union(covered[j]))
                 if gain > best[1]:
                     best = (j, gain)
-            all_covered = all_covered.union(covered[best[0]])
+            current_covered = current_covered.union(covered[best[0]])
             logger.debug(
                 f"Chose explanation {best[0]} with coverage {best[1] / len(self.data)}"
             )

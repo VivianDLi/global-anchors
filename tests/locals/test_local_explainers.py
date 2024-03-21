@@ -1,15 +1,11 @@
-import numpy as np
 import omegaconf
 from hydra.utils import instantiate
 
 from globalanchors import constants
 from globalanchors.local.anchors import TextAnchors
-from globalanchors.types import (
-    ExplainerOutput,
-    InputData,
-)
 
 LOCAL_CONFIG_FILE = constants.HYDRA_CONFIG_PATH / "local" / "anchors.yaml"
+SAMPLER_CONFIG_FILE = constants.HYDRA_CONFIG_PATH / "sampler" / "unk.yaml"
 
 
 def test_instantiate_local():
@@ -22,22 +18,63 @@ def test_instantiate_local():
     assert isinstance(explainer, TextAnchors)
 
 
-def test_explain():
+def test_explain_null_anchor():
     """Test explain function runs."""
     cfg = omegaconf.OmegaConf.load(LOCAL_CONFIG_FILE)
-
     explainer = instantiate(cfg)
+    sampler = instantiate(omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE))
+    explainer.set_sampler(sampler)
     # initialize test data
-    test_example = InputData(
-        text="This is a test sentence.",
-        tokens=np.array(["This", "is", "a", "test", "sentence", "."]),
-        positions=np.array([0, 1, 2, 3, 4, 5]),
-        label=0,
-    )
     test_model = lambda x: [1 for _ in x]
+    test_example = "This is a test sentence."
+    expected_keys = set(
+        [
+            "example",
+            "explanation",
+            "precision",
+            "coverage",
+            "prediction",
+            "num_samples",
+        ]
+    )
     # run test
     explanation = explainer.explain(test_example, test_model)
     assert explanation, "Explanation not returned!"
-    assert isinstance(
-        explanation, ExplainerOutput
-    ), f"Expected NeighbourhoodData, got {type(explanation)}."
+
+    current_keys = set(explanation.keys())
+    assert (
+        current_keys == expected_keys
+    ), f"Output for explainer {cfg} is missing keys {expected_keys - current_keys}."
+
+
+def test_explain_complex_anchor():
+    """Test explain function runs."""
+    cfg = omegaconf.OmegaConf.load(LOCAL_CONFIG_FILE)
+    explainer = instantiate(cfg)
+    sampler = instantiate(omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE))
+    explainer.set_sampler(sampler)
+    # initialize test data
+    test_model = lambda xs: [1 if "test" in x else 0 for x in xs]
+    test_example = "This is a test sentence."
+    expected_feature = "test"
+    expected_keys = set(
+        [
+            "example",
+            "explanation",
+            "precision",
+            "coverage",
+            "prediction",
+            "num_samples",
+        ]
+    )
+    # run test
+    explanation = explainer.explain(test_example, test_model)
+    assert explanation, "Explanation not returned!"
+
+    current_keys = set(explanation.keys())
+    assert (
+        current_keys == expected_keys
+    ), f"Output for explainer {cfg} is missing keys {expected_keys - current_keys}."
+    assert (
+        expected_feature in explanation["explanation"]
+    ), f"Expected feature {expected_feature} as anchor, but got {explanation['explanation']} instead."

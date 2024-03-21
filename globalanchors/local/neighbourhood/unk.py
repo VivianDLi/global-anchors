@@ -2,7 +2,7 @@
 
 Used by the original Anchors paper (https://ojs.aaai.org/index.php/AAAI/article/view/11491)."""
 
-from typing import Tuple, override
+from typing import Tuple
 import numpy as np
 
 from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
@@ -20,13 +20,13 @@ class UnkTokenSampler(NeighbourhoodSampler):
             use_generator_probabilities=use_generator_probabilities
         )
 
-    @override
+    # override
     def perturb_samples(
         self,
         example: InputData,
         data: np.ndarray,
         model: Model,
-        compute_labels: bool,
+        compute_labels: bool = True,
     ) -> Tuple[np.ndarray, np.ndarray, np.array]:
         """Generates new text strings and labels in the neighbourhood of an example given the words in the example to replace."""
         # create array of string tokens

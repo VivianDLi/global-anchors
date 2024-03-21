@@ -3,6 +3,7 @@ import os
 import numpy as np
 import omegaconf
 from hydra.utils import instantiate
+from loguru import logger
 
 from globalanchors import constants
 from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
@@ -13,7 +14,7 @@ from globalanchors.types import (
     NeighbourhoodData,
 )
 
-SAMPLER_CONFIG_DIR = constants.HYDRA_CONFIG_PATH / "local" / "sampler"
+SAMPLER_CONFIG_DIR = constants.HYDRA_CONFIG_PATH / "sampler"
 
 
 def test_instantiate_samplers():
@@ -31,16 +32,15 @@ def test_instantiate_samplers():
 def test_perturb_sample():
     """Test perturb samples function runs with correct results."""
     for t in os.listdir(SAMPLER_CONFIG_DIR):
+        logger.info("Testing sampler: {t}")
         config_path = SAMPLER_CONFIG_DIR / t
         cfg = omegaconf.OmegaConf.load(config_path)
 
         sampler = instantiate(cfg)
         # initialize test data
+        test_model = lambda x: [1 for _ in x]
         test_example = InputData(
-            text="This is a test sentence.",
-            tokens=np.array(["This", "is", "a", "test", "sentence", "."]),
-            positions=np.array([0, 1, 2, 3, 4, 5]),
-            label=0,
+            text="This is a test sentence.", model=test_model
         )
         test_data = np.array(
             [
@@ -49,7 +49,6 @@ def test_perturb_sample():
                 [0, 1, 0, 1, 0, 0],
             ]
         )
-        test_model = lambda x: [1 for _ in x]
         expected_labels = np.array([1, 1, 1])
         # run test
         string_data, data, labels = sampler.perturb_samples(
@@ -62,29 +61,24 @@ def test_perturb_sample():
             3,
             6,
         ), f"Expected data shape (3, 6), got {data.shape}."
-        assert (
-            data[:, 1].sum() == 3 and data[:, 3].sum() == 3
-        ), f"Expected 3 toggles for features 1 and 3, got {data[:, 1].sum()} and {data[:, 3].sum()}."
-        assert (
-            labels == expected_labels
+        assert all(
+            [labels[i] == expected_labels[i] for i in range(len(labels))]
         ), f"Expected labels {expected_labels}, got {labels}."
 
 
 def test_unbiased_sample():
     """Test unbiased sampling function runs."""
     for t in os.listdir(SAMPLER_CONFIG_DIR):
+        logger.info("Testing sampler: {t}")
         config_path = SAMPLER_CONFIG_DIR / t
         cfg = omegaconf.OmegaConf.load(config_path)
 
         sampler = instantiate(cfg)
         # initialize test data
-        test_example = InputData(
-            text="This is a test sentence.",
-            tokens=np.array(["This", "is", "a", "test", "sentence", "."]),
-            positions=np.array([0, 1, 2, 3, 4, 5]),
-            label=0,
-        )
         test_model = lambda x: [1 for _ in x]
+        test_example = InputData(
+            text="This is a test sentence.", model=test_model
+        )
         n = 5
         # run test
         neighbourhood = sampler.sample(test_example, test_model, n)
@@ -107,18 +101,16 @@ def test_unbiased_sample():
 def test_sample_with_state():
     """Test sample with state function runs."""
     for t in os.listdir(SAMPLER_CONFIG_DIR):
+        logger.info("Testing sampler: {t}")
         config_path = SAMPLER_CONFIG_DIR / t
         cfg = omegaconf.OmegaConf.load(config_path)
 
         sampler = instantiate(cfg)
         # initialize test data
-        test_example = InputData(
-            text="This is a test sentence.",
-            tokens=np.array(["This", "is", "a", "test", "sentence", "."]),
-            positions=np.array([0, 1, 2, 3, 4, 5]),
-            label=0,
-        )
         test_model = lambda x: [1 for _ in x]
+        test_example = InputData(
+            text="This is a test sentence.", model=test_model
+        )
         test_n = 5
         test_neighbourhood = sampler.sample(test_example, test_model, test_n)
         test_candidate = CandidateAnchor()

@@ -11,6 +11,7 @@ from globalanchors import constants
 from globalanchors.combined.base import GlobalAnchors
 from globalanchors.datasets import DataLoader
 from globalanchors.local.anchors import TextAnchors
+from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
 from globalanchors.metrics import (
     calculate_local_metrics,
     calculate_global_metrics,
@@ -24,6 +25,7 @@ def explain_model(cfg: DictConfig):
     The dataloader is instantiated from ``cfg.dataloader``.
     The model is instantiated from ``cfg.model``.
     The local explainer is instantiated from ``cfg.local_explainer``.
+    The neighbourhood sampling method used in the local explainer is instantiated from ``cfg.sampler``.
     The global explainer is instantiated from ``cfg.global_explainer``.
     The model/explainer is always trained and tested and all available metrics are logged.
 
@@ -38,6 +40,12 @@ def explain_model(cfg: DictConfig):
 
     logger.info(f"Instantiating model: <{cfg.model._target_}>...")
     model: BaseModel = hydra.utils.instantiate(cfg.model)
+
+    logger.info(
+        f"Instantiating and setting sampler for model: <{cfg.sampler._target_}>..."
+    )
+    sampler: NeighbourhoodSampler = hydra.utils.instantiate(cfg.sampler)
+    model.set_sampler(sampler)
 
     logger.info(
         f"Instantiating local explainer: <{cfg.local_explainer._target_}>..."
@@ -56,7 +64,7 @@ def explain_model(cfg: DictConfig):
         project=constants.WANDB_PROJECT,
         entity=constants.WANDB_ENTITY,
         config=cfg,
-        name="",
+        name=cfg.name,
     )
 
     dataset = dataloader.dataset

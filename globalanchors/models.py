@@ -41,4 +41,4 @@ class RF(BaseModel):
 
 class NN(BaseModel):
     def __init__(self):
-        super().__init__(MLPClassifier())
+        super().__init__(MLPClassifier(max_iter=1000))

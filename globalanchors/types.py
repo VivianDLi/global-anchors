@@ -1,7 +1,7 @@
 """Types used in the library."""
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import (
     Callable,
     Dict,
@@ -16,15 +16,11 @@ from typing import (
 import numpy as np
 import spacy
 
-from globalanchors.local.utils import exp_normalize
-from globalanchors.utils import normalize_feature_indices
+from globalanchors.utils import normalize_feature_indices, exp_normalize
 
 from loguru import logger
 
 ## Training Types
-
-NeighbourhoodSamplerType = Literal["GA", "POS", "UNK"]
-ModelType = Literal["SVM", "RF", "MLP"]
 
 Model = Callable[[List[str]], List[int]]
 
@@ -93,22 +89,26 @@ class NeighbourhoodData:
         self.data = data
         self.labels = labels
         self.current_idx = self.data.shape[0]
-        self.prealloc_size = 0
+        self.prealloc_size = 10000
 
     def reallocate(self):
         """Pre-allocate new memory to internal storage arrays."""
         self.string_data = np.vstack(
-            self.string_data,
-            np.zeros(
-                (self.prealloc_size, self.string_data.shape[1]),
-                self.string_data.dtype,
-            ),
+            (
+                self.string_data,
+                np.zeros(
+                    (self.prealloc_size, self.string_data.shape[1]),
+                    self.string_data.dtype,
+                ),
+            )
         )
         self.data = np.vstack(
-            self.data,
-            np.zeros(
-                (self.prealloc_size, self.data.shape[1]), self.data.dtype
-            ),
+            (
+                self.data,
+                np.zeros(
+                    (self.prealloc_size, self.data.shape[1]), self.data.dtype
+                ),
+            )
         )
         self.labels = np.hstack(
             (self.labels, np.zeros(self.prealloc_size, self.labels.dtype))
@@ -143,15 +143,15 @@ class NeighbourhoodData:
 
 @dataclass
 class CandidateAnchor:
-    feats: Set[str] = set()
-    feat_indices: Set[int] = set()
+    feats: Set[str] = field(default_factory=set)
+    feat_indices: Set[int] = field(default_factory=set)
     precision: float = 0
     coverage: float = 0
     prediction: int = 1
     num_samples: int = 0
     num_positives: int = 0
-    data_idx: Set[int] = set()
-    coverage_idx: Set[int] = set()
+    data_idx: Set[int] = field(default_factory=set)
+    coverage_idx: Set[int] = field(default_factory=set)
 
 
 @dataclass
@@ -186,15 +186,14 @@ class BeamState:
         data = self.neighbourhood.data[: self.neighbourhood.current_idx]
         labels = self.neighbourhood.labels[: self.neighbourhood.current_idx]
         feature_indices = range(self.n_features)
-        new_candidates = []
         for f_i in feature_indices:
             # calculate data indices covered by candidate anchor
             feat_present = data[:, f_i].nonzero()[0]
             # calculate data indices and precision
             covered_indices = set(feat_present)
             num_samples = float(len(covered_indices))
-            num_positives = float(labels[covered_indices].sum())
-            precision = num_positives / num_samples
+            num_positives = float(labels[list(covered_indices)].sum())
+            precision = num_positives / num_samples if num_samples > 0 else 0
             # calculate coverage indices and coverage
             coverage_present = self.coverage_data[:, f_i].nonzero()[0]
             coverage_indices = set(coverage_present)
@@ -205,20 +204,18 @@ class BeamState:
             prediction = self.example.label
             feats = set([self.example.tokens[f_i]])
             feat_indices = set([f_i])
-            new_candidates.append(
-                CandidateAnchor(
-                    feats,
-                    feat_indices,
-                    precision,
-                    coverage,
-                    prediction,
-                    num_samples,
-                    num_positives,
-                    covered_indices,
-                    coverage_indices,
-                )
+            new_anchor = CandidateAnchor(
+                feats,
+                feat_indices,
+                precision,
+                coverage,
+                prediction,
+                num_samples,
+                num_positives,
+                covered_indices,
+                coverage_indices,
             )
-        self.anchors = new_candidates
+            self.set_anchor([f_i], new_anchor)
 
 
 class ExplainerOutput(TypedDict):
@@ -269,6 +266,9 @@ class Individual:
     def __ge__(self, other):
         return self.fitness >= other.fitness
 
+    def copy(self) -> "Individual":
+        return deepcopy(self)
+
 
 @dataclass
 class Population:
@@ -279,43 +279,32 @@ class Population:
         self,
         example: InputData,
         num_samples: int,
-        individuals: List[Individual] = None,
-        probs: List[float] = None,
     ):
         # setup initial population
-        if example is not None:
-            logger.debug("Initializing from example.")
-            initial_fitness = 0
-            self.individuals = sorted(
-                [
-                    Individual(example.tokens, initial_fitness)
-                    for _ in range(num_samples)
-                ]
-            )
-            self.probs = (np.ones(num_samples) / num_samples).tolist()
-        else:
-            logger.debug("Initializing from existing individuals.")
-            assert (
-                individuals is not None and probs is not None
-            ), "Individuals and probabilities must be provided."
-            self.individuals = individuals
-            self.probs = probs
-
-    def __init__(self, individuals: List[Individual], probs: List[float]):
-        self.individuals = individuals
-        self.probs = probs
-
-    def evaluate_fitness(self, fitness_fn: Callable[[Individual], float]):
-        """Calculates fitness for each individual, sorts the population, and normalizes fitness values into probabilities."""
-        fitnesses = []
-        for indv in self.individuals:
-            indv.fitness = fitness_fn(indv)
-            fitnesses.append(fitness_fn(indv))
-        self.probs = exp_normalize(
-            np.array(fitnesses) / sum(fitnesses)
-        ).tolist()
-
-    def copy(self):
-        return Population(
-            None, 0, individuals=deepcopy(self.individuals), probs=self.probs
+        initial_fitness = 0
+        self.individuals = sorted(
+            [
+                Individual(example.tokens, initial_fitness)
+                for _ in range(num_samples)
+            ]
         )
+        self.probs = (np.ones(num_samples) / num_samples).tolist()
+
+    def evaluate_population(
+        self, fitness_fn: Callable[[Individual], float], population_size: int
+    ):
+        """Calculates fitness for each individual, sorts the population, and normalizes fitness values into probabilities."""
+        for indv in self.individuals:
+            indv.fitness = fitness_fn(indv.gene)
+        # sort individuals
+        self.individuals = sorted(self.individuals, key=lambda x: x.fitness)
+        # truncate population
+        self.individuals = self.individuals[:population_size]
+        fitnesses = [indv.fitness for indv in self.individuals]
+        # calculate normalized probabilities
+        if sum(fitnesses) == 0:  # handle 0 prob case
+            self.probs = (np.ones(len(fitnesses)) / len(fitnesses)).tolist()
+        else:
+            self.probs = exp_normalize(
+                np.array(fitnesses) / sum(fitnesses)
+            ).tolist()

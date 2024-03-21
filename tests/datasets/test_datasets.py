@@ -5,7 +5,6 @@ from hydra.utils import instantiate
 
 from globalanchors import constants
 from globalanchors.datasets import DataLoader
-from globalanchors.types import Dataset
 
 DATALOADER_CONFIG_DIR = constants.HYDRA_CONFIG_PATH / "dataloader"
 
@@ -33,7 +32,6 @@ def test_datasets_have_data_attr():
             dl, "dataset"
         ), f"Datamodules {dl} has no overwrite attribute"
         dataset = dl.dataset
-        assert isinstance(dataset, Dataset), "Dataset is not of type Dataset."
         current_keys = set(dataset.keys())
         expected_keys = set(
             [

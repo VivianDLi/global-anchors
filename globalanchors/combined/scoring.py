@@ -1,4 +1,4 @@
-from typing import List, override
+from typing import List
 
 import numpy as np
 
@@ -47,7 +47,7 @@ class RuleScoring(GlobalAnchors):
         # combine
         return (coverage_score + rule_coverage_score / 2).tolist()
 
-    @override
+    #override
     def combine_rules(self) -> List[ExplainerOutput]:
         # generate explanations
         explanations = []

@@ -2,7 +2,7 @@
 
 Used by the original Anchors paper (https://ojs.aaai.org/index.php/AAAI/article/view/11491)."""
 
-from typing import Tuple, override
+from typing import Tuple
 import numpy as np
 
 from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
@@ -19,13 +19,13 @@ class PartOfSpeechSampler(NeighbourhoodSampler):
             use_generator_probabilities=use_generator_probabilities,
         )
 
-    @override
+    # override
     def perturb_samples(
         self,
         example: InputData,
         data: np.ndarray,
         model: Model,
-        compute_labels: bool,
+        compute_labels: bool = True,
     ) -> Tuple[np.ndarray, np.ndarray, np.array]:
         """Generates new text strings and labels in the neighbourhood of an example given the words in the example to replace."""
         # create array of string tokens
@@ -51,11 +51,13 @@ class PartOfSpeechSampler(NeighbourhoodSampler):
                 data[i] = example.tokens == raw_data[i]
         else:  # replace one by one
             for i, masked_string in enumerate(masked_data):
-                for j in np.where(data[i] == 0)[0]:
-                    words, probs = self._get_unmasked_words(masked_string)[j]
+                for mask_i, string_i in enumerate(np.where(data[i] == 0)[0]):
+                    words, probs = self._get_unmasked_words(masked_string)[
+                        mask_i
+                    ]
                     masked_word = np.random.choice(words, p=probs)
                     # replace mask tokens
-                    raw_data[i, j] = masked_word
+                    raw_data[i, string_i] = masked_word
                 # correct data array for matching tokens
                 data[i] = example.tokens == raw_data[i]
         string_data = [" ".join(string_array) for string_array in raw_data]

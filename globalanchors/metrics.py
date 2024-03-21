@@ -12,7 +12,10 @@ from globalanchors.types import GlobalMetrics, LocalMetrics, Model
 
 
 def calculate_local_metrics(
-    explainer: TextAnchors, dataset: List[str], model: Model
+    explainer: TextAnchors,
+    dataset: List[str],
+    model: Model,
+    log_to_wandb: bool = True,
 ) -> LocalMetrics:
     """Calculates local metrics for a given dataset.
 
@@ -41,20 +44,31 @@ def calculate_local_metrics(
         precisions.append(explanation["precision"])
         num_samples.append(explanation["num_samples"])
         # check that precision and coverage are valid for f1
-        assert explanation["precision"] >= 0 and explanation["precision"] <= 1, f"Precision must be between 0 and 1. Precision for example {explanation["example"]} was {explanation["precision"]} instead."
-        assert explanation["coverage"] >= 0 and explanation["coverage"] <= 1, f"Coverage must be between 0 and 1. Coverage for example {explanation["example"]} was {explanation["coverage"]} instead."
-        f1_scores.append(2 * (explanation["precision"] * explanation["coverage"]) / (explanation["precision"] + explanation["coverage"]))
+        assert (
+            explanation["precision"] >= 0 and explanation["precision"] <= 1
+        ), f"Precision must be between 0 and 1. Precision for example {explanation['example']} was {explanation['precision']} instead."
+        assert (
+            explanation["coverage"] >= 0 and explanation["coverage"] <= 1
+        ), f"Coverage must be between 0 and 1. Coverage for example {explanation['example']} was {explanation['coverage']} instead."
+        f1_scores.append(
+            2
+            * (explanation["precision"] * explanation["coverage"])
+            / (explanation["precision"] + explanation["coverage"])
+        )
 
         # log intermediate results to wandb
-        wandb.log({
-            "local/intermediate/example": data,
-            "local/intermediate/rule-length": rule_lengths[-1],
-            "local/intermediate/coverage": coverages[-1],
-            "local/intermediate/precision": precisions[-1],
-            "local/intermediate/f1": f1_scores[-1],
-            "local/intermediate/num-samples": num_samples[-1],
-            "local/intermediate/time-taken": times[-1],
-        })
+        if log_to_wandb:
+            wandb.log(
+                {
+                    "local/intermediate/example": data,
+                    "local/intermediate/rule-length": rule_lengths[-1],
+                    "local/intermediate/coverage": coverages[-1],
+                    "local/intermediate/precision": precisions[-1],
+                    "local/intermediate/f1": f1_scores[-1],
+                    "local/intermediate/num-samples": num_samples[-1],
+                    "local/intermediate/time-taken": times[-1],
+                }
+            )
 
     return {
         "rule_length": sum(rule_lengths) / len(rule_lengths),
@@ -67,7 +81,7 @@ def calculate_local_metrics(
 
 
 def calculate_global_metrics(
-    explainer: GlobalAnchors, dataset: List[str]
+    explainer: GlobalAnchors, dataset: List[str], log_to_wandb: bool = True
 ) -> GlobalMetrics:
     """Calculates global metrics for a given dataset.
 
@@ -88,9 +102,17 @@ def calculate_global_metrics(
         coverages.append(explanation["coverage"])
         precisions.append(explanation["precision"])
         # check that precision and coverage are valid for f1
-        assert explanation["precision"] >= 0 and explanation["precision"] <= 1, f"Precision must be between 0 and 1. Precision for example {explanation["example"]} was {explanation["precision"]} instead."
-        assert explanation["coverage"] >= 0 and explanation["coverage"] <= 1, f"Coverage must be between 0 and 1. Coverage for example {explanation["example"]} was {explanation["coverage"]} instead."
-        f1_scores.append(2 * (explanation["precision"] * explanation["coverage"]) / (explanation["precision"] + explanation["coverage"]))
+        assert (
+            explanation["precision"] >= 0 and explanation["precision"] <= 1
+        ), f"Precision must be between 0 and 1. Precision for example {explanation['example']} was {explanation['precision']} instead."
+        assert (
+            explanation["coverage"] >= 0 and explanation["coverage"] <= 1
+        ), f"Coverage must be between 0 and 1. Coverage for example {explanation['example']} was {explanation['coverage']} instead."
+        f1_scores.append(
+            2
+            * (explanation["precision"] * explanation["coverage"])
+            / (explanation["precision"] + explanation["coverage"])
+        )
     global_rule_length = sum(rule_lengths) / len(rule_lengths)
     global_rule_coverage = sum(coverages) / len(coverages)
     global_rule_precision = sum(precisions) / len(precisions)
@@ -104,13 +126,18 @@ def calculate_global_metrics(
         num_rules.append(len(output["explanations"]))
         if output["rule_used"] is not None:
             rule_lengths.append(len(output["rule_used"]["explanation"]))
-        accuracies.append(1 if output["prediction"] == explainer.model([data])[0] else 0)
+        accuracies.append(
+            1 if output["prediction"] == explainer.model([data])[0] else 0
+        )
         # log intermediate results to wandb
-        wandb.log({
-            "global/intermediate/example": data,
-            "global/intermediate/num-valid-rules": num_rules[-1]
-        })
-    
+        if log_to_wandb:
+            wandb.log(
+                {
+                    "global/intermediate/example": data,
+                    "global/intermediate/num-valid-rules": num_rules[-1],
+                }
+            )
+
     return {
         "global_rule_length": global_rule_length,
         "global_rule_coverage": global_rule_coverage,

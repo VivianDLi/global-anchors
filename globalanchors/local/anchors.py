@@ -20,7 +20,6 @@ from globalanchors.types import (
 class TextAnchors:
     def __init__(
         self,
-        sampler: NeighbourhoodSampler,
         confidence_threshold: float = 0.95,
         epsilon: float = 0.1,
         delta: float = 0.05,
@@ -30,7 +29,7 @@ class TextAnchors:
         max_anchor_size: int = None,
         stop_on_first: bool = False,
         coverage_samples: int = 10000,
-        log_interval: int = 5,
+        log_interval: int = 500,
     ):
         """_summary_
 
@@ -41,13 +40,13 @@ class TextAnchors:
             delta (float, optional): _description_. Defaults to 0.05.
             batch_size (int, optional): _description_. Defaults to 10.
             beam_size (int, optional): _description_. Defaults to 4.
-            min_start_samples (int, optional): _description_. Defaults to 0.
+            min_start_samples (int, optional): _description_. Defaults to 15.
             max_anchor_size (int, optional): _description_. Defaults to None.
             stop_on_first (bool, optional): _description_. Defaults to False.
             coverage_samples (int, optional): _description_. Defaults to 10000.
             log_interval (int, optional): _description_. Defaults to 5.
         """
-        self.sampler = sampler
+        self.sampler = None
         self.confidence_threshold = confidence_threshold
         self.epsilon = epsilon
         self.delta = delta
@@ -71,10 +70,19 @@ class TextAnchors:
         Returns:
             List[CandidateAnchor]: List of new anchors.
         """
-        feature_indices = range(state["n_features"])
+        feature_indices = range(state.n_features)
         # initialize an empty anchor for the base case of no previous candidates
         if len(past_candidates) == 0:
-            past_candidates = [CandidateAnchor()]
+            past_candidates = [
+                CandidateAnchor(
+                    coverage=1,
+                    prediction=state.example.label,
+                    num_samples=0,
+                    num_positives=0,
+                    coverage_idx=set(range(state.coverage_data.shape[0])),
+                    data_idx=set(),
+                )
+            ]
         # calculate new anchors by adding each feature to existing candidates and update state
         new_candidates: List[CandidateAnchor] = []
         for f_i in feature_indices:
@@ -90,18 +98,8 @@ class TextAnchors:
                 ]:
                     continue
                 new_feats = set(
-                    [state["example"].words[i]] for i in new_feat_indices
+                    [state.example.tokens[i] for i in new_feat_indices]
                 )
-                # combine data indices and recalculate precision
-                prev_indices = np.array(list(p_cand.data_idx))
-                prev_data = state.neighbourhood.data[prev_indices]
-                feat_present = np.where(prev_data[prev_indices, f_i] == 1)[0]
-                new_covered_indices = set(prev_indices[feat_present])
-                new_num_samples = float(len(new_covered_indices))
-                new_num_positives = float(
-                    state.neighbourhood.labels[new_covered_indices].sum()
-                )
-                new_precision = new_num_positives / new_num_samples
                 # combine coverage indices and recalculate coverage
                 new_coverage_indices = p_cand.coverage_idx.intersection(
                     feat_cand.coverage_idx
@@ -110,6 +108,32 @@ class TextAnchors:
                     float(len(new_coverage_indices))
                     / state.coverage_data.shape[0]
                 )
+                # combine data indices and recalculate precision
+                prev_indices = np.array(list(p_cand.data_idx))
+                # account for the base case of no previous indices
+                if len(prev_indices) == 0:
+                    new_candidates.append(
+                        CandidateAnchor(
+                            new_feats,
+                            new_feat_indices,
+                            0,
+                            new_coverage,
+                            state.example.label,
+                            0,
+                            0,
+                            p_cand.data_idx,
+                            new_coverage_indices,
+                        )
+                    )
+                    continue
+                prev_data = state.neighbourhood.data[prev_indices]
+                feat_present = np.where(prev_data[:, f_i] == 1)[0]
+                new_covered_indices = set(prev_indices[feat_present])
+                new_num_samples = float(len(new_covered_indices))
+                new_num_positives = float(
+                    state.neighbourhood.labels[list(new_covered_indices)].sum()
+                )
+                new_precision = new_num_positives / new_num_samples
                 # new metadata
                 new_prediction = state.example.label
                 new_candidates.append(
@@ -140,7 +164,7 @@ class TextAnchors:
         """
         # initialize bounds arrays
         n_features = len(candidates)
-        n_samples = np.array([cand.num_features for cand in candidates])
+        n_samples = np.array([cand.num_samples for cand in candidates])
         n_positives = np.array([cand.num_positives for cand in candidates])
         upper_bounds = np.zeros(n_samples.shape)
         lower_bounds = np.zeros(n_samples.shape)
@@ -175,10 +199,10 @@ class TextAnchors:
         lower_i, upper_i = _update_bounds(t, means)
         diff = upper_bounds[upper_i] - lower_bounds[lower_i]
         while diff > self.epsilon:
-            # logging
+            # logging (disabled for tests)
             if t % self.log_interval:
                 logger.info(
-                    f"Best Stats: (i: {lower_i}, mean: {means[lower_i]:.1f}, n: {n_samples[lower_i]}, lb: {lower_bounds[lower_i]:.4f})\nWorst Stats: (i: {upper_i}, mean: {means[upper_i]:.1f}, n: {n_samples[upper_i]}, lb: {upper_bounds[upper_i]:.4f})\nDiff: {diff:.2f}"
+                    f"\nBest Stats: (i: {lower_i}, mean: {means[lower_i]:.1f}, n: {n_samples[lower_i]}, lb: {lower_bounds[lower_i]:.4f})\nWorst Stats: (i: # {upper_i}, mean: {means[upper_i]:.1f}, n: {n_samples[upper_i]}, lb: {upper_bounds[upper_i]:.4f})\nDiff: {diff:.2f}"
                 )
             # generate samples
             candidates[upper_i], state = (
@@ -249,27 +273,25 @@ class TextAnchors:
                     np.unique(neighbourhood.labels, return_counts=True)[1]
                 )
             ]
-            return {
-                "feats": set(),
-                "feat_indices": set(),
-                "precision": mean,
-                "coverage": 1,
-                "prediction": pred_label,
-                "num_samples": neighbourhood.data.shape[0],
-            }
+            return CandidateAnchor(
+                precision=mean,
+                coverage=1,
+                prediction=pred_label,
+                num_samples=neighbourhood.data.shape[0],
+            )
         ## enter main beam search loop
         # pre-allocate neighbourhood data memory
         neighbourhood.prealloc_size = self.batch_size * 10000
         neighbourhood.reallocate()
         # initial loop state
-        state = {
-            "neighbourhood": neighbourhood,
-            "anchors": [],
-            "coverage_data": coverage_data,
-            "n_features": neighbourhood.data.shape[1],
-            "example": example_data,
-            "model": model,
-        }
+        state = BeamState(
+            neighbourhood=neighbourhood,
+            anchors={},
+            coverage_data=coverage_data,
+            n_features=neighbourhood.data.shape[1],
+            example=example_data,
+            model=model,
+        )
         state.initialize_features()
         current_size = 1
         best_anchors_per_size: Dict[int, List[CandidateAnchor]] = {0: []}
@@ -297,8 +319,11 @@ class TextAnchors:
             best_anchors_per_size[current_size] = [
                 candidates[i] for i in candidate_indices
             ]
+            # add candidates to state dict
+            for candidate in best_anchors_per_size[current_size]:
+                state.set_anchor(candidate.feat_indices, candidate)
             logger.debug(
-                f"Best of anchor size {current_size}: {best_anchors_per_size[current_size]}"
+                f"Best of anchor size {current_size}: {[cand.feats for cand in best_anchors_per_size[current_size]]}"
             )
             # choose beam_size new best candidates based on coverage
             early_stop = False
@@ -309,7 +334,7 @@ class TextAnchors:
                     1.0
                     / (
                         self.delta
-                        / (1 + (self.beam_size - 1) * state["n_features"])
+                        / (1 + (self.beam_size - 1) * state.n_features)
                     )
                 )
                 mean = candidate.num_positives / candidate.num_samples
@@ -317,7 +342,7 @@ class TextAnchors:
                 upper_bound = bernoulli_ub(mean, beta / candidate.num_samples)
                 coverage = candidate.coverage
                 logger.debug(
-                    f"Mean, LB, UB, and Coverage for the {i}th anchor {candidate}: {mean:0.2f}, {lower_bound:0.2f}, {upper_bound:0.2f}, {coverage:0.2f}."
+                    f"Mean, LB, UB, and Coverage for the {i}th anchor {candidate.feats}: {mean:0.2f}, {lower_bound:0.2f}, {upper_bound:0.2f}, {coverage:0.2f}."
                 )
                 # until confidence threshold is met, continue sampling neighbourhood and updating LB and UB
                 while (
@@ -380,8 +405,13 @@ class TextAnchors:
             best_anchor = all_candidates[candidate_indices[0]]
         return best_anchor
 
+    def set_sampler(self, sampler: NeighbourhoodSampler):
+        self.sampler = sampler
+
     def explain(
-        self, example: Union[str, bytes], model: Model, **kwargs
+        self,
+        example: Union[str, bytes],
+        model: Model,
     ) -> ExplainerOutput:
         """Creates local explanations for a textual example using Anchors for a given model.
 
@@ -389,6 +419,9 @@ class TextAnchors:
             example (str): Textual example to generate explanations for.
             model (Model): ML Model to explain.
         """
+        assert (
+            self.sampler is not None
+        ), "Sampler must be set with <set_sampler> before explaining."
         # optionally decode a byte input
         if type(example) == bytes:
             logger.debug("Decoding byte string example.")
@@ -402,6 +435,6 @@ class TextAnchors:
             "explanation": exp.feats,
             "precision": exp.precision,
             "coverage": exp.coverage,
-            "prediction": exp.label,
+            "prediction": exp.prediction,
             "num_samples": exp.num_samples,
         }

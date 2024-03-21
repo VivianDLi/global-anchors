@@ -7,7 +7,7 @@ import torch
 
 from loguru import logger
 
-from globalanchors.local.utils import exp_normalize
+from globalanchors.utils import exp_normalize
 from globalanchors.types import (
     InputData,
     CandidateAnchor,
@@ -31,11 +31,14 @@ class NeighbourhoodSampler(ABC):
         self.use_generator = use_generator
         self.use_generator_probabilities = use_generator_probabilities
         self.use_constant_probabilities = use_constant_probabilities
+        # for any models created afterward
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
         if self.use_constant_probabilities:
-            self.use_generator = False
             self.use_generator_probabilities = False
             logger.info(
-                "For constant probabilities, the generator will not be initialized. Setting <use_generator> to False."
+                "For constant probabilities, generator probabilities cannot be used. Setting <use_generator_probabilities> to False."
             )
         if self.use_generator_probabilities:
             self.use_generator = True
@@ -46,9 +49,6 @@ class NeighbourhoodSampler(ABC):
             from transformers import DistilBertTokenizer, DistilBertForMaskedLM
 
             # import BERT for text generation
-            self.device = torch.device(
-                "cuda" if torch.cuda.is_available() else "cpu"
-            )
             self.bert_tokenizer = DistilBertTokenizer.from_pretrained(
                 "distilbert-base-cased"
             )
@@ -69,11 +69,11 @@ class NeighbourhoodSampler(ABC):
         # check for cached output for consistency + optimization
         if masked_text in self.bert_cache:
             return self.bert_cache[masked_text]
-        encoded_input = torch.tensor(
-            self.bert_tokenizer.encode(masked_text, add_special_tokens=True)
+        encoded_input = self.bert_tokenizer.encode(
+            masked_text, add_special_tokens=True
         )
         masked_inputs = (
-            (encoded_input == self.bert_tokenizer.mask_token_id)
+            (torch.tensor(encoded_input) == self.bert_tokenizer.mask_token_id)
             .numpy()
             .nonzero()[0]
         )
@@ -100,7 +100,7 @@ class NeighbourhoodSampler(ABC):
         example: InputData,
         data: np.ndarray,
         model: Model,
-        compute_labels: bool,
+        compute_labels: bool = True,
     ) -> Tuple[np.ndarray, np.ndarray, np.array]:
         """Generates new text strings and labels in the neighbourhood of an example given the words in the example to replace.
 
@@ -212,7 +212,7 @@ class NeighbourhoodSampler(ABC):
             # randomly select each feature (i.e., probability = 0.5)
             probabilities = np.ones_like(probabilities) * 0.5
         # resets candidate anchor features to probability 1 (i.e., always choose)
-        probabilities[:, candidate.feat_indices] = 1
+        probabilities[:, list(candidate.feat_indices)] = 1
         # randomly choose either 0 and 1 for each sample/feature depending on probabilities
         random_sample = np.random.uniform(0, 1, size=probabilities.shape)
         new_data = (random_sample < probabilities).astype(int)
@@ -222,7 +222,12 @@ class NeighbourhoodSampler(ABC):
         # update state neighbourhood
         state.neighbourhood.update(new_string_data, new_data, new_labels)
         ## update candidate information
-        new_idx = set(range(self.current_idx, self.current_idx + n))
+        new_idx = set(
+            range(
+                state.neighbourhood.current_idx,
+                state.neighbourhood.current_idx + n,
+            )
+        )
         candidate.data_idx = candidate.data_idx.union(
             new_idx
         )  # all new generated samples are covered by candidate

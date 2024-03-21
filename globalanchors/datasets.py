@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 import shutil
 import tarfile
-from typing import override
 from sklearn.model_selection import train_test_split
 import wget
 from loguru import logger
@@ -22,7 +21,7 @@ class DataLoader(ABC):
         self.dataset = self.load_dataset()
 
     @abstractmethod
-    def download_dataset(self) -> str:
+    def download_dataset(self) -> Path:
         return NotImplementedError
 
     def load_dataset(self) -> Dataset:
@@ -38,10 +37,10 @@ class DataLoader(ABC):
                 data.append(line.strip())
                 labels.append(l)
         train, test, train_labels, test_labels = train_test_split(
-            data, labels, self.test_split
+            data, labels, test_size=self.test_split
         )
         train, val, train_labels, val_labels = train_test_split(
-            train, train_labels, self.val_split
+            train, train_labels, test_size=self.val_split
         )
         return {
             "train_data": train,
@@ -54,66 +53,77 @@ class DataLoader(ABC):
 
 
 class PolarityDataLoader(DataLoader):
-    @override
-    def download_dataset(self) -> str:
+    # override
+    def download_dataset(self) -> Path:
         data_dir = Path(DATA_PATH)
+        data_dir.mkdir(parents=True, exist_ok=True)
         # download dataset and extract
         URL = "https://www.cs.cornell.edu/people/pabo/movie-review-data/rt-polaritydata.tar.gz"
         if not os.path.exists(data_dir / "PolarityData"):
             logger.info("Downloading polarity dataset...")
             wget.download(URL, str(data_dir / "rt-polaritydata.tar.gz"))
+            logger.info("Unzipping polarity dataset...")
             with tarfile.open(data_dir / "rt-polaritydata.tar.gz") as tar:
-                tar.extractall(data_dir, filter="fully_trusted")
+                tar.extractall(data_dir)
         else:
             logger.info("Found existing polarity dataset.")
-            return str(data_dir / "PolarityData")
+            return data_dir / "PolarityData"
         ## standardize format for loading
         # create necessary files and directories
-        positive_file = data_dir / "PolarityData/1.txt"
+        positive_file = data_dir / "PolarityData" / "1.txt"
         positive_file.parent.mkdir(parents=True, exist_ok=True)
-        negative_file = data_dir / "PolarityData/0.txt"
+        negative_file = data_dir / "PolarityData" / "0.txt"
         negative_file.parent.mkdir(parents=True, exist_ok=True)
         # copy data to new files
-        with open(positive_file, "w") as f:
-            with open(data_dir / "rt-polaritydata/rt-polarity.pos") as pos:
+        with open(positive_file, "wb") as f:
+            with open(
+                data_dir / "rt-polaritydata/rt-polarity.pos", "rb"
+            ) as pos:
                 f.write(pos.read())
-        with open(negative_file, "w") as f:
-            with open(data_dir / "rt-polaritydata/rt-polarity.neg") as neg:
+        with open(negative_file, "wb") as f:
+            with open(
+                data_dir / "rt-polaritydata/rt-polarity.neg", "rb"
+            ) as neg:
                 f.write(neg.read())
         # clean-up
         (data_dir / "rt-polaritydata.tar.gz").unlink()
+        (data_dir / "rt-polaritydata.README.1.0.txt").unlink()
         shutil.rmtree(data_dir / "rt-polaritydata")
         return data_dir / "PolarityData"
 
 
 class SubjectivityDataLoader(DataLoader):
-    @override
-    def download_dataset(self) -> str:
+    # override
+    def download_dataset(self) -> Path:
         data_dir = Path(DATA_PATH)
+        data_dir.mkdir(parents=True, exist_ok=True)
         # download dataset and extract
         URL = "http://www.cs.cornell.edu/people/pabo/movie-review-data/rotten_imdb.tar.gz"
         if not os.path.exists(data_dir / "SubjectivityData"):
             logger.info("Downloading subjectivity dataset...")
             wget.download(URL, str(data_dir / "rotten_imdb.tar.gz"))
+            logger.info("Unzipping subjectivity dataset...")
             with tarfile.open(data_dir / "rotten_imdb.tar.gz") as tar:
-                tar.extractall(data_dir, filter="fully_trusted")
+                tar.extractall(data_dir)
         else:
             logger.info("Found existing subjectivity dataset.")
-            return str(data_dir / "SubjectivityData")
+            return data_dir / "SubjectivityData"
         ## standardize format for loading
         # create necessary files and directories
-        subjective_file = data_dir / "SubjectivityData/1.txt"
+        subjective_file = data_dir / "SubjectivityData" / "1.txt"
         subjective_file.parent.mkdir(parents=True, exist_ok=True)
-        objective_file = data_dir / "SubjectivityData/0.txt"
+        objective_file = data_dir / "SubjectivityData" / "0.txt"
         objective_file.parent.mkdir(parents=True, exist_ok=True)
         # copy data to new files
-        with open(subjective_file, "w") as f:
-            with open(data_dir / "rotten_imdb/quote.tok.gt9.5000") as subj:
+        with open(subjective_file, "wb") as f:
+            with open(data_dir / "quote.tok.gt9.5000", "rb") as subj:
                 f.write(subj.read())
-        with open(objective_file, "w") as f:
-            with open(data_dir / "rotten_imdb/plot.tok.gt9.5000") as obj:
+        with open(objective_file, "wb") as f:
+            with open(data_dir / "plot.tok.gt9.5000", "rb") as obj:
                 f.write(obj.read())
         # clean-up
         (data_dir / "rotten_imdb.tar.gz").unlink()
-        shutil.rmtree(data_dir / "rotten_imdb")
+        (data_dir / "plot.tok.gt9.5000").unlink()
+        (data_dir / "quote.tok.gt9.5000").unlink()
+        (data_dir / "subjdata.README.1.0").unlink()
         return data_dir / "PolarityData"

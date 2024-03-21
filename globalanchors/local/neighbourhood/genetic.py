@@ -3,7 +3,7 @@
 Inspired by LORE (https://arxiv.org/pdf/1805.10820.pdf)."""
 
 from functools import partial
-from typing import List, Tuple, override
+from typing import List, Tuple
 import numpy as np
 import torch
 
@@ -50,12 +50,12 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         # check for cached output for consistency + optimization
         if text in self.encoder_cache:
             return self.encoder_cache[text]
-        encoded_input = torch.tensor(
-            self.bert_tokenizer.encode(text, add_special_tokens=True)
+        encoded_input = self.bert_tokenizer.encode(
+            text, add_special_tokens=True
         )
         model_input = torch.tensor([encoded_input], device=self.device)
         with torch.no_grad():  # for memory optimization
-            encoding = self.bert(model_input)[0][0, 0, :].numpy()
+            encoding = self.bert(model_input)[0][0, 0, :].cpu().numpy()
         self.encoder_cache[text] = encoding
         return self.encoder_cache[text]
 
@@ -82,8 +82,15 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         # indicator for identical example
         example_score = 1 if indv_text == example_text else 0
         # weighted indicator for required features
-        features_score = np.mean(
-            [1 if feature in indv_text else 0 for feature in required_features]
+        features_score = (
+            np.mean(
+                [
+                    1 if feature in indv_text else 0
+                    for feature in required_features
+                ]
+            )
+            if len(required_features) > 0
+            else 1
         )
         return label_score + (1 - dist_score) + features_score - example_score
 
@@ -91,14 +98,14 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         self, population: Population
     ) -> List[Tuple[Individual, Individual]]:
         """Randomly selects a subset of the population to be parents for the next generation proportional to their fitness."""
-        n_generated = self.crossover_prop * len(population.individuals)
+        n_generated = round(self.crossover_prop * len(population.individuals))
         parents = []
         for _ in range(n_generated):
             # select two parents at random
             parent1, parent2 = np.random.choice(
                 population.individuals, 2, p=population.probs, replace=False
             )
-            parents.append((parent1, parent2))
+            parents.append((parent1.copy(), parent2.copy()))
         return parents
 
     def _crossover(
@@ -150,20 +157,18 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         fitness_fn = partial(
             self._fitness, same_label, required_features, example, model
         )
-        for _ in self.n_generations:
+        for _ in range(self.n_generations):
             # select parents
             parents = self._select(population)
             # crossover parents to create children
             children = self._crossover(parents)
             # mutate children
             new_individuals = self._mutate(population.individuals + children)
-            population.individuals.extend(new_individuals)
-            # evaluate population fitness (and sort)
-            population.evaluate_fitness(fitness_fn)
-            # update (select the fittest individuals)
-            population.individuals = population.individuals[:population_size]
+            population.individuals = new_individuals
+            # evaluate population fitness (and sort + truncate for next generation)
+            population.evaluate_population(fitness_fn, population_size)
         # correct data array for matching tokens
-        for i, indv in population.indiviuals:
+        for i, indv in enumerate(population.individuals):
             data[i] = example.tokens == indv.gene
         return data, [" ".join(indv.gene) for indv in population.individuals]
 
@@ -186,14 +191,17 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
             Tuple[np.ndarray, List[str]]: _description_
         """
         # initialize population from example and evaluate preliminary fitnesses
-        initial_population = Population(example, num_samples / 2)
+        different_population = Population(example, num_samples // 2)
+        matching_population = Population(
+            example, num_samples - num_samples // 2
+        )
         # generate samples with matching labels
         matching_data, matching_samples = self._genetic_algorithm(
-            initial_population.copy(), True, required_features, example, model
+            matching_population, True, required_features, example, model
         )
         # generate samples with non-matching labels
         different_data, different_samples = self._genetic_algorithm(
-            initial_population.copy(), False, required_features, example, model
+            different_population, False, required_features, example, model
         )
         # combine samples and return
         return (
@@ -201,20 +209,20 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
             matching_samples + different_samples,
         )
 
-    @override
+    # override
     def perturb_samples(
         self,
         example: InputData,
         data: np.ndarray,
         model: Model,
-        compute_labels: bool,
+        compute_labels: bool = True,
     ) -> Tuple[np.ndarray, np.ndarray, np.array]:
         """Generates new text strings and labels in the neighbourhood of an example given the words in the example to replace."""
         assert len(data) > 0, "Data array must have at least one sample."
         # get anchor required tokens (assuming constant probability => data is the same for all samples)
         required_features = example.tokens[data[0] == 1].tolist()
         data, string_data = self.generate_samples(
-            example, data.shape[0], required_features
+            example, data.shape[0], required_features, model
         )
         # compute labels (optional)
         labels = np.ones(data.shape[0], dtype=int)
