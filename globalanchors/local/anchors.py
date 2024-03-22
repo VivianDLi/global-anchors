@@ -347,6 +347,7 @@ class TextAnchors:
             )
             # choose beam_size new best candidates based on coverage
             early_stop = False
+            logger.debug(f"Candidates: {best_anchors_per_size[current_size]}.")
             for i, candidate in zip(
                 candidate_indices, best_anchors_per_size[current_size]
             ):
@@ -419,7 +420,7 @@ class TextAnchors:
                 ]
                 for cand in cand_list
             ]
-            candidate_indices = self._get_best_candidates(
+            _, candidate_indices = self._get_best_candidates(
                 all_candidates, state
             )
             best_anchor = all_candidates[candidate_indices[0]]
