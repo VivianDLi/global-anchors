@@ -6,7 +6,6 @@ from globalanchors.metrics import (
     calculate_local_metrics,
     calculate_global_metrics,
 )
-from globalanchors.anchor_types import LocalMetrics, GlobalMetrics
 
 GLOBAL_CONFIG_FILE = (
     constants.HYDRA_CONFIG_PATH / "combined" / "submodular.yaml"
@@ -38,7 +37,7 @@ def test_local_metrics():
     )
     # run test
     metrics = calculate_local_metrics(
-        test_explainer, test_dataset, test_model, log_to_wandb=False
+        test_explainer, test_dataset, log_to_wandb=False
     )
     assert metrics, "Metrics not returned!"
 
@@ -54,13 +53,13 @@ def test_global_metrics():
     local_explainer = instantiate(omegaconf.OmegaConf.load(LOCAL_CONFIG_FILE))
     test_sampler = instantiate(omegaconf.OmegaConf.load(SAMPLER_CONFIG_FILE))
     test_model = lambda x: [1 for _ in x]
-    test_explainer.set_functions(test_sampler, test_model)
+    local_explainer.set_functions(test_sampler, test_model)
     test_explainer = instantiate(omegaconf.OmegaConf.load(GLOBAL_CONFIG_FILE))
     test_dataset = [
         "This is a test sentence.",
         "This is another test sentence.",
     ]
-    test_explainer.train(local_explainer, test_dataset, test_model)
+    test_explainer.train(local_explainer, test_dataset)
     expected_keys = set(
         [
             "global_rule_length",
@@ -70,6 +69,7 @@ def test_global_metrics():
             "average_valid_rules",
             "rule_length",
             "accuracy",
+            "coverage",
         ]
     )
     # run test

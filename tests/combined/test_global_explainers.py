@@ -46,7 +46,7 @@ def test_train():
             "This is another test sentence.",
         ]
         # run tests
-        explainer.train(test_explainer, test_data, test_model)
+        explainer.train(test_explainer, test_data)
         assert explainer.data == test_data, "Data not set!"
         assert explainer.model == test_model, "Model not set!"
         assert hasattr(explainer, "rules") and isinstance(
@@ -76,7 +76,7 @@ def test_explain():
             "This is another test sentence.",
         ]
         test_example = "This is a test sentence."
-        explainer.train(test_explainer, test_data, test_model)
+        explainer.train(test_explainer, test_data)
         expected_keys = set(
             ["example", "explanations", "rule_used", "prediction"]
         )

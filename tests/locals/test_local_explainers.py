@@ -38,7 +38,7 @@ def test_explain_null_anchor():
         ]
     )
     # run test
-    explanation = explainer.explain(test_example, test_model)
+    explanation = explainer.explain(test_example)
     assert explanation, "Explanation not returned!"
 
     current_keys = set(explanation.keys())
@@ -68,7 +68,7 @@ def test_explain_complex_anchor():
         ]
     )
     # run test
-    explanation = explainer.explain(test_example, test_model)
+    explanation = explainer.explain(test_example)
     assert explanation, "Explanation not returned!"
 
     current_keys = set(explanation.keys())

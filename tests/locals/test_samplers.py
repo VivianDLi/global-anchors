@@ -32,7 +32,7 @@ def test_instantiate_samplers():
 def test_perturb_sample():
     """Test perturb samples function runs with correct results."""
     for t in os.listdir(SAMPLER_CONFIG_DIR):
-        logger.info("Testing sampler: {t}")
+        logger.info(f"Testing sampler: {t}")
         config_path = SAMPLER_CONFIG_DIR / t
         cfg = omegaconf.OmegaConf.load(config_path)
 
@@ -69,7 +69,7 @@ def test_perturb_sample():
 def test_unbiased_sample():
     """Test unbiased sampling function runs."""
     for t in os.listdir(SAMPLER_CONFIG_DIR):
-        logger.info("Testing sampler: {t}")
+        logger.info(f"Testing sampler: {t}")
         config_path = SAMPLER_CONFIG_DIR / t
         cfg = omegaconf.OmegaConf.load(config_path)
 
@@ -101,7 +101,7 @@ def test_unbiased_sample():
 def test_sample_with_state():
     """Test sample with state function runs."""
     for t in os.listdir(SAMPLER_CONFIG_DIR):
-        logger.info("Testing sampler: {t}")
+        logger.info(f"Testing sampler: {t}")
         config_path = SAMPLER_CONFIG_DIR / t
         cfg = omegaconf.OmegaConf.load(config_path)
 
