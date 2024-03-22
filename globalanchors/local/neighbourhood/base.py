@@ -186,7 +186,7 @@ class NeighbourhoodSampler(ABC):
             n (int, optional): Number of new examples to generate. Defaults to 1.
 
         Returns:
-            Tuple[CandidateAnchor, BeamState]: _description_
+            Tuple[CandidateAnchor, BeamState]: Tuple of updated candidate anchor and state
         """
         # calculate replacement probabilities for each feature not in the candidate anchor
         n_features = len(state.example.tokens)

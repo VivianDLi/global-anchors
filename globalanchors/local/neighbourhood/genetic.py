@@ -196,16 +196,16 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         required_features: List[str],
         model: Model,
     ) -> Tuple[np.ndarray, List[str], List[float]]:
-        """_summary_
+        """Generates samples using a genetic algorithm.
 
         Args:
-            example (InputData): _description_
-            num_samples (int): _description_
-            required_features (List[str]): _description_
-            model (Model): _description_
+            example (InputData): example to generate samples around
+            num_samples (int): number of samples to generate.
+            required_features (List[str]): required features in generated samples.
+            model (Model): model to evaluate labels with.
 
         Returns:
-            Tuple[np.ndarray, List[str], List[float]]: _description_
+            Tuple[np.ndarray, List[str], List[float]]: Tuple of dat indices, new strings, and fitnesses of the population
         """
         if num_samples == 1:
             # generate a single sample
@@ -220,18 +220,22 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
             example, num_samples - num_samples // 2
         )
         # generate samples with matching labels
-        matching_data, matching_samples, matching_fitnesses = self._genetic_algorithm(
-            matching_population, True, required_features, example, model
+        matching_data, matching_samples, matching_fitnesses = (
+            self._genetic_algorithm(
+                matching_population, True, required_features, example, model
+            )
         )
         # generate samples with non-matching labels
-        different_data, different_samples, different_fitnesses = self._genetic_algorithm(
-            different_population, False, required_features, example, model
+        different_data, different_samples, different_fitnesses = (
+            self._genetic_algorithm(
+                different_population, False, required_features, example, model
+            )
         )
         # combine samples and return
         return (
             np.vstack((matching_data, different_data)),
             matching_samples + different_samples,
-            matching_fitnesses + different_fitnesses
+            matching_fitnesses + different_fitnesses,
         )
 
     # override

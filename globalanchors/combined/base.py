@@ -27,10 +27,10 @@ class GlobalAnchors(ABC):
         """Generates a subset of global rules for a model from a set of local rules created by running an explainer on a dataset.
 
         Args:
-            model (Model): _description_
+            model (Model): model to use
 
         Returns:
-            List[ExplainerOutput]: _description_
+            List[ExplainerOutput]: list of global rules
         """
         return NotImplementedError
 

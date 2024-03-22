@@ -31,20 +31,19 @@ class TextAnchors:
         coverage_samples: int = 10000,
         log_interval: int = 500,
     ):
-        """_summary_
+        """Generates local explanations for examples using Anchors.
 
         Args:
-            sampler (NeighbourhoodSampler): _description_
-            confidence_threshold (float, optional): _description_. Defaults to 0.95.
-            epsilon (float, optional): _description_. Defaults to 0.1.
-            delta (float, optional): _description_. Defaults to 0.05.
-            batch_size (int, optional): _description_. Defaults to 10.
-            beam_size (int, optional): _description_. Defaults to 4.
-            min_start_samples (int, optional): _description_. Defaults to 15.
-            max_anchor_size (int, optional): _description_. Defaults to None.
-            stop_on_first (bool, optional): _description_. Defaults to False.
-            coverage_samples (int, optional): _description_. Defaults to 10000.
-            log_interval (int, optional): _description_. Defaults to 5.
+            confidence_threshold (float, optional): Precision threshold for candidate anchors. Defaults to 0.95.
+            epsilon (float, optional): Confidence threshold. Defaults to 0.1.
+            delta (float, optional): Delta hyperparameter for estimating confidence. Defaults to 0.05.
+            batch_size (int, optional): Number of samples to generate each time. Defaults to 10.
+            beam_size (int, optional): Number of candidates to keep track of. Defaults to 4.
+            min_start_samples (int, optional): Initial sample size. Defaults to 15.
+            max_anchor_size (int, optional): Maximum number of features in an anchor. None equates to the input length. Defaults to None.
+            stop_on_first (bool, optional): Stops on the first candidate anchor with high enough precision. Defaults to False.
+            coverage_samples (int, optional): Number of samples to use to calcualte coverage. Defaults to 10000.
+            log_interval (int, optional): When to log confidence estimations. Defaults to 5.
         """
         self.sampler = None
         self.model = None
@@ -187,7 +186,9 @@ class TextAnchors:
             )
             n_samples[i] = candidates[i].num_samples
             n_positives[i] = candidates[i].num_positives
-            logger.debug(f"Num Samples after correcting for candidate {i}: {n_samples}.")
+            logger.debug(
+                f"Num Samples after correcting for candidate {i}: {n_samples}."
+            )
 
         # define function to calculate bounds from array
         def _update_bounds(t, means):
@@ -335,7 +336,9 @@ class TextAnchors:
                 )
                 break
             # select the new best candidates with confidence bounds
-            candidates, candidate_indices = self._get_best_candidates(candidates, state)
+            candidates, candidate_indices = self._get_best_candidates(
+                candidates, state
+            )
             best_anchors_per_size[current_size] = [
                 candidates[i] for i in candidate_indices
             ]
