@@ -129,7 +129,9 @@ def calculate_global_metrics(
         if output["rule_used"] is not None:
             rule_lengths.append(len(output["rule_used"]["explanation"]))
         accuracies.append(
-            1 if output["prediction"] == explainer.model([data])[0] else 0
+            1
+            if output["prediction"] == explainer.explainer.model([data])[0]
+            else 0
         )
         covered.append(1 if len(output["explanations"]) > 0 else 0)
         # log intermediate results to wandb
