@@ -43,6 +43,7 @@ class GlobalAnchors(ABC):
         """
         self.explanation_cache = {}
         self.explainer = explainer
+        self.model = explainer.model
         self.data = data
         self.rules = self.combine_rules()
 

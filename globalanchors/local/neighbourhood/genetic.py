@@ -6,7 +6,7 @@ from functools import partial
 from typing import List, Tuple
 from loguru import logger
 import numpy as np
-import torch
+from sentence_transformers import util
 
 from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
 from globalanchors.local.utils import get_distance_function
@@ -39,26 +39,11 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
             use_constant_probabilities=True,
         )
         # initialize encoder (generator initialized in base class) for fitness distance
-        from transformers import DistilBertModel
+        from sentence_transformers import SentenceTransformer
 
-        self.encoder = DistilBertModel.from_pretrained("distilbert-base-cased")
-        self.encoder.to(self.device)
-        self.encoder.eval()
-        self.encoder_cache = {}
-
-    def _encode(self, text: str) -> np.array:
-        """Encodes a string into a numerical representation."""
-        # check for cached output for consistency + optimization
-        if text in self.encoder_cache:
-            return self.encoder_cache[text]
-        encoded_input = self.bert_tokenizer.encode(
-            text, add_special_tokens=True
+        self.encoder = SentenceTransformer(
+            "all-MiniLM-L6-v2", device=self.device.type
         )
-        model_input = torch.tensor([encoded_input], device=self.device)
-        with torch.no_grad():  # for memory optimization
-            encoding = self.encoder(model_input)[0][0, 0, :].cpu().numpy()
-        self.encoder_cache[text] = encoding
-        return self.encoder_cache[text]
 
     def _fitness(
         self,
@@ -66,37 +51,58 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         required_features: List[str],
         example: InputData,
         model: Model,
-        gene: np.array,
-    ) -> float:
-        indv_text = " ".join(gene)
+        genes: List[str],
+    ) -> List[float]:
+        """Computes fitness for a population."""
         example_text = " ".join(example.tokens)
         if same_label:
             # indicator for matching labels
-            label_score = 1 if model([indv_text])[0] == example.label else 0
-        else:
-            # indicator for mismatched labels
-            label_score = 1 if model([indv_text])[0] != example.label else 0
-        # distance between embeddings
-        dist_score = self.distance_function(
-            self._encode(indv_text), self._encode(example_text)
-        )
-        # indicator for identical example
-        example_score = 1 if indv_text == example_text else 0
-        # weighted indicator for required features
-        features_score = (
-            np.mean(
+            label_scores = np.array(
                 [
-                    1 if feature in indv_text else 0
-                    for feature in required_features
+                    1 if model([gene])[0] == example.label else 0
+                    for gene in genes
                 ]
             )
-            if len(required_features) > 0
-            else 1
+        else:
+            # indicator for mismatched labels
+            label_scores = np.array(
+                [
+                    1 if model([gene])[0] != example.label else 0
+                    for gene in genes
+                ]
+            )
+        # distance between embeddings
+        gene_embeddings = self.encoder.encode(genes, convert_to_tensor=True)
+        example_embedding = self.encoder.encode(
+            [example_text], convert_to_tensor=True
         )
-        # logger.debug(
-        #     f"Distance for indv {indv_text} on example {example_text}: {dist_score}."
-        # )
-        return label_score + (1 - dist_score) + features_score - example_score
+        cosine_scores = util.cos_sim(gene_embeddings, example_embedding).cpu()
+        dist_scores = np.array(
+            [1 - cosine_scores[i][0] for i in range(len(genes))]
+        )
+        # indicator for identical example
+        example_scores = np.array(
+            [1 if gene == example_text else 0 for gene in genes]
+        )
+        # weighted indicator for required features
+        features_scores = np.array(
+            [
+                (
+                    np.mean(
+                        [
+                            1 if feature in gene else 0
+                            for feature in required_features
+                        ]
+                    )
+                    if len(required_features) > 0
+                    else 1
+                )
+                for gene in genes
+            ]
+        )
+        return (
+            label_scores + dist_scores + features_scores - example_scores
+        ).tolist()
 
     def _select(
         self, population: Population
@@ -129,24 +135,30 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
             new_gene[crossover_points[0] : crossover_points[1]] = gene2[
                 crossover_points[0] : crossover_points[1]
             ]
-            logger.debug(new_gene)
             children.append(Individual(new_gene, 0))
         return children
 
     def _mutate(self, individuals: List[Individual]) -> List[Individual]:
-        """For each gene in each individual, randomly replace with a new gene with probability <self.mutation_prob>."""
-        for indv in individuals:
-            masked_idx = (
-                np.random.uniform(0, 1, len(indv.gene)) < self.mutation_prob
-            )
-            indv.gene[masked_idx] = self.bert_tokenizer.mask_token
-            masked_string = " ".join(indv.gene)
-            results = self._get_unmasked_words(masked_string)
-            masked_words = np.array(
-                [np.random.choice(words, p=probs) for words, probs in results]
-            )
-            # replace mask tokens
-            indv.gene[masked_idx] = masked_words
+        """Randomly replace a random feature for each individual with probability <self.mutation_prob>."""
+        mutation_idxs = np.where(
+            np.random.uniform(0, 1, len(individuals)) < self.mutation_prob
+        )[0]
+        masked_strings = []
+        masked_ids = []
+        # mutate individuals
+        for i in mutation_idxs:
+            masked_id = np.random.choice(len(individuals[i].gene))
+            individuals[i].gene[
+                masked_id
+            ] = self.fill_masker.tokenizer.mask_token
+            masked_strings.append(" ".join(individuals[i].gene))
+            masked_ids.append(masked_id)
+        results = self._get_unmasked_words(masked_strings)
+        # replace mask tokens
+        for result_i, data_i in enumerate(mutation_idxs):
+            words, probs = results[masked_strings[result_i]]
+            masked_word = np.random.choice(words, p=probs)
+            individuals[data_i].gene[masked_ids[result_i]] = masked_word
         return individuals
 
     def _genetic_algorithm(

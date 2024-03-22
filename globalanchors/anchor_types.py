@@ -292,11 +292,15 @@ class Population:
         self.probs = (np.ones(num_samples) / num_samples).tolist()
 
     def evaluate_population(
-        self, fitness_fn: Callable[[Individual], float], population_size: int
+        self,
+        fitness_fn: Callable[[List[np.array]], List[float]],
+        population_size: int,
     ):
         """Calculates fitness for each individual, sorts the population, and normalizes fitness values into probabilities."""
-        for indv in self.individuals:
-            indv.fitness = fitness_fn(indv.gene)
+        genes = [" ".join(indv.gene) for indv in self.individuals]
+        fitnesses = fitness_fn(genes)
+        for i, indv in enumerate(self.individuals):
+            indv.fitness = fitnesses[i]
         # sort individuals
         self.individuals = sorted(
             self.individuals, key=lambda x: x.fitness, reverse=True

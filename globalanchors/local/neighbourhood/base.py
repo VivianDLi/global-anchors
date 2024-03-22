@@ -1,7 +1,7 @@
 """Base general implementation of neighbourhood generation for local explainers."""
 
 from abc import ABC, abstractmethod
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 import numpy as np
 import torch
 
@@ -46,54 +46,41 @@ class NeighbourhoodSampler(ABC):
                 "For generator probabilities to be used, generator must be enabled. Setting <use_generator> to True."
             )
         if self.use_generator:
-            from transformers import (
-                DistilBertTokenizerFast,
-                DistilBertForMaskedLM,
-            )
+            from transformers import pipeline
 
-            # import BERT for text generation
-            self.bert_tokenizer = DistilBertTokenizerFast.from_pretrained(
-                "distilbert-base-cased"
+            # import BERT for masked text generation
+            self.fill_masker = pipeline(
+                "fill-mask",
+                model="bert-base-cased",
+                framework="pt",
+                device=self.device,
             )
-            self.bert = DistilBertForMaskedLM.from_pretrained(
-                "distilbert-base-cased"
-            )
-            self.bert.to(self.device)
-            self.bert.eval()
-            self.bert_cache = {}
 
     def _get_unmasked_words(
-        self, masked_text: str
-    ) -> List[Tuple[List[str], List[float]]]:
-        """Gets a list of generated words and probabilities for each word for each masked token."""
+        self, masked_texts: List[str], top_k: int = 25
+    ) -> Dict[str, Tuple[List[str], List[float]]]:
+        """Gets a list of generated words and probabilities for a batch of masked inputs (only supports one mask token)."""
         assert (
             self.use_generator
         ), "Text generator must be enabled to generate unmasked words."
-        # check for cached output for consistency + optimization
-        if masked_text in self.bert_cache:
-            return self.bert_cache[masked_text]
-        encoded_input = self.bert_tokenizer.encode(masked_text)
-        masked_inputs = (
-            (torch.tensor(encoded_input) == self.bert_tokenizer.mask_token_id)
-            .numpy()
-            .nonzero()[0]
-        )
-        model_input = torch.tensor([encoded_input], device=self.device)
-        with torch.no_grad():  # for memory optimization
-            output = self.bert(model_input)[0]
-        # extract words and probabilities from model output
-        generated_words = []
-        for i in masked_inputs:
-            probs, top_words = torch.topk(
-                output[0, i], 100
-            )  # top 500 generated words
-            words = self.bert_tokenizer.convert_ids_to_tokens(top_words)
-            probs = np.array([float(prob) for prob in probs])
-            generated_words.append((words, probs))
-        self.bert_cache[masked_text] = [
-            (words, exp_normalize(probs)) for words, probs in generated_words
-        ]
-        return self.bert_cache[masked_text]
+        results = {}
+        mask_results = self.fill_masker(masked_texts, top_k=top_k)
+        for i, masked_input in enumerate(masked_texts):
+            # mask_results[i] is a list of dictionaries (or mask_results is a list of dictionaries if no batch is used)
+            print(mask_results[0])
+            words = (
+                [result["token_str"] for result in mask_results[i]]
+                if len(masked_texts) > 1
+                else [result["token_str"] for result in mask_results]
+            )
+            probs = np.array(
+                [result["score"] for result in mask_results[i]]
+                if len(masked_texts) > 1
+                else [result["score"] for result in mask_results]
+            )
+            probs = exp_normalize(probs).tolist()
+            results[masked_input] = (words, probs)
+        return results
 
     @abstractmethod
     def perturb_samples(
@@ -156,10 +143,12 @@ class NeighbourhoodSampler(ABC):
             # usually swaps low-probability words (i.e., expect to move away from distribution boundaries)
             for i in range(n_features):
                 masked_tokens = example.tokens.copy()
-                masked_tokens[i] = self.bert_tokenizer.mask_token
+                masked_tokens[i] = self.fill_masker.tokenizer.mask_token
                 masked_string = " ".join(masked_tokens)
-                words, probs = self._get_unmasked_words(masked_string)[
-                    0
+                words, probs = self._get_unmasked_words(
+                    [masked_string], top_k=500
+                )[
+                    masked_string
                 ]  # get first (only) masked element
                 probabilities[:, i] = min(
                     0.5, dict(zip(words, probs)).get(example.tokens[i], 0.01)
@@ -209,10 +198,12 @@ class NeighbourhoodSampler(ABC):
             # usually swaps low-probability words (i.e., expect to move away from distribution boundaries)
             for i in range(n_features):
                 masked_tokens = state.example.tokens.copy()
-                masked_tokens[i] = self.bert_tokenizer.mask_token
+                masked_tokens[i] = self.fill_masker.tokenizer.mask_token
                 masked_string = " ".join(masked_tokens)
-                words, probs = self._get_unmasked_words(masked_string)[
-                    0
+                words, probs = self._get_unmasked_words(
+                    [masked_string], top_k=500
+                )[
+                    masked_string
                 ]  # get first (only) masked element
                 probabilities[:, i] = min(
                     0.5,

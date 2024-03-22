@@ -8,7 +8,7 @@ import wandb
 
 from globalanchors.combined.base import GlobalAnchors
 from globalanchors.local.anchors import TextAnchors
-from globalanchors.anchor_types import GlobalMetrics, LocalMetrics, Model
+from globalanchors.anchor_types import GlobalMetrics, LocalMetrics
 
 
 def calculate_local_metrics(

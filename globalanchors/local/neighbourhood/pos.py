@@ -10,10 +10,7 @@ from globalanchors.anchor_types import InputData, Model
 
 
 class PartOfSpeechSampler(NeighbourhoodSampler):
-    def __init__(
-        self, use_generator_probabilities: bool = False, one_pass: bool = True
-    ):
-        self.one_pass = one_pass
+    def __init__(self, use_generator_probabilities: bool = False):
         super().__init__(
             use_generator=True,
             use_generator_probabilities=use_generator_probabilities,
@@ -31,35 +28,19 @@ class PartOfSpeechSampler(NeighbourhoodSampler):
         # create array of string tokens
         raw_data = np.zeros(data.shape, "|U80")
         raw_data[:] = example.tokens
-        # set all disabled tokens to a mask token
-        raw_data[data == 0] = self.bert_tokenizer.mask_token
-        # concatenate tokens to get masked string data
-        masked_data = [" ".join(string_array) for string_array in raw_data]
-        # replace mask tokens with generated words
-        if self.one_pass:  # replace all at once
-            for i, masked_string in enumerate(masked_data):
-                results = self._get_unmasked_words(masked_string)
-                masked_words = np.array(
-                    [
-                        np.random.choice(words, p=probs)
-                        for words, probs in results
-                    ]
-                )
+        # replace mask tokens with generated words one by one
+        for i, data_row in enumerate(data):
+            for string_i in np.where(data_row == 0)[0]:
+                raw_data[i, string_i] = self.fill_masker.tokenizer.mask_token
+                masked_string = " ".join(raw_data[i])
+                words, probs = self._get_unmasked_words([masked_string])[
+                    masked_string
+                ]
+                masked_word = np.random.choice(words, p=probs)
                 # replace mask tokens
-                raw_data[i, data[i] == 0] = masked_words
-                # correct data array for matching tokens
-                data[i] = example.tokens == raw_data[i]
-        else:  # replace one by one
-            for i, masked_string in enumerate(masked_data):
-                for mask_i, string_i in enumerate(np.where(data[i] == 0)[0]):
-                    words, probs = self._get_unmasked_words(masked_string)[
-                        mask_i
-                    ]
-                    masked_word = np.random.choice(words, p=probs)
-                    # replace mask tokens
-                    raw_data[i, string_i] = masked_word
-                # correct data array for matching tokens
-                data[i] = example.tokens == raw_data[i]
+                raw_data[i, string_i] = masked_word
+            # correct data array for matching tokens
+            data[i] = example.tokens == raw_data[i]
         string_data = [" ".join(string_array) for string_array in raw_data]
         # compute labels (optional)
         labels = np.ones(data.shape[0], dtype=int)
