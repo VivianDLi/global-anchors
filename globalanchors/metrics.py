@@ -10,7 +10,13 @@ import wandb
 from globalanchors.local.neighbourhood.genetic import GeneticAlgorithmSampler
 from globalanchors.combined.base import GlobalAnchors
 from globalanchors.local.anchors import TextAnchors
-from globalanchors.anchor_types import GeneticMetrics, GlobalMetrics, InputData, LocalMetrics, Model
+from globalanchors.anchor_types import (
+    GeneticMetrics,
+    GlobalMetrics,
+    InputData,
+    LocalMetrics,
+    Model,
+)
 
 
 def calculate_local_metrics(
@@ -156,9 +162,27 @@ def calculate_global_metrics(
         "coverage": sum(covered) / len(covered),
     }
 
-def calculate_genetic_metrics(sampler: GeneticAlgorithmSampler, model: Model, dataset: List[str]) -> GeneticMetrics:
+
+def calculate_genetic_metrics(
+    sampler: GeneticAlgorithmSampler, model: Model, dataset: List[str]
+) -> GeneticMetrics:
     fitnesses = []
-    examples = wandb.Table(columns=["Input", "Anchor", "PosEx. 1", "PosEx. 2", "PosEx. 3", "PosEx. 4", "PosEx. 5", "NegEx. 1", "NegEx. 2", "NegEx. 3", "NegEx. 4", "NegEx. 5"])
+    examples = wandb.Table(
+        columns=[
+            "Input",
+            "Anchor",
+            "PosEx. 1",
+            "PosEx. 2",
+            "PosEx. 3",
+            "PosEx. 4",
+            "PosEx. 5",
+            "NegEx. 1",
+            "NegEx. 2",
+            "NegEx. 3",
+            "NegEx. 4",
+            "NegEx. 5",
+        ]
+    )
     for data in dataset:
         # initialize random anchor
         if type(data) == bytes:
@@ -173,7 +197,9 @@ def calculate_genetic_metrics(sampler: GeneticAlgorithmSampler, model: Model, da
         random_sample = np.random.uniform(0, 1, size=probabilities.shape)
         data_idx = (random_sample < probabilities).astype(int)
         # perturb 5 random samples
-        required_features = example.tokens[data_idx[0] == 1].tolist() # keep anchor constant - set first row as fixed
+        required_features = example.tokens[
+            data_idx[0] == 1
+        ].tolist()  # keep anchor constant - set first row as fixed
         _, string_data, indv_fitnesses = sampler.generate_samples(
             example, 10, required_features, model
         )
@@ -181,10 +207,12 @@ def calculate_genetic_metrics(sampler: GeneticAlgorithmSampler, model: Model, da
         population_fitness = sum(indv_fitnesses) / len(indv_fitnesses)
         fitnesses.append(population_fitness)
         # log examples
-        table_data = [example.text] + [f"({", ".join(required_features)})"] + string_data
+        table_data = (
+            [example.text]
+            + [f"({', '.join(required_features)})"]
+            + string_data
+        )
         examples.add_data(*table_data)
         wandb.log({"fitness": population_fitness, "examples": examples})
-        
-    return {
-        "fitness": np.array(fitnesses)
-    }
+
+    return {"fitness": np.array(fitnesses)}
