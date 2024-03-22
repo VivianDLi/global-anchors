@@ -157,7 +157,11 @@ def calculate_global_metrics(
         "global_rule_precision": global_rule_precision,
         "global_rule_f1": global_rule_f1,
         "average_valid_rules": sum(num_rules) / len(num_rules),
-        "rule_length": sum(rule_lengths) / len(rule_lengths),
+        "rule_length": (
+            sum(rule_lengths) / len(rule_lengths)
+            if len(rule_lengths) > 0
+            else 0
+        ),
         "accuracy": sum(accuracies) / len(accuracies),
         "coverage": sum(covered) / len(covered),
     }
