@@ -19,10 +19,10 @@ parameters:
     value: 0.5
 
   sampler.mutation_prob:
-    values: [0.05, 0.1, 0.15, 0.2]
+    values: [0.1, 0.15, 0.2]
 
   sampler.n_generations:
-    values: [5, 10, 25, 50, 75, 100]
+    values: [10, 25, 50, 100]
   
 command:
   - ${env}

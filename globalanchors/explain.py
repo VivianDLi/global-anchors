@@ -88,7 +88,7 @@ def explain_model(cfg: DictConfig):
     )
 
     logger.info("Getting small subset for compute...")
-    data = dataset["val_data"][:50]
+    data = dataset["val_data"][:30]
 
     logger.info("Generating Local Explanations!")
     local_results = calculate_local_metrics(local_explainer, data)

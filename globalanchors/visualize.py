@@ -56,10 +56,11 @@ def genetic_algorithm_tuning(cfg: DictConfig):
     dataset = dataloader.dataset
     logger.info("Starting training!")
     model.train(dataset)
-
-    fitness = calculate_genetic_metrics(sampler, model, dataset["test_data"])[
-        "fitness"
-    ]
+    
+    logger.info("Only run on an example of the data.")
+    data = dataset["test_data"][50]
+    
+    fitness = calculate_genetic_metrics(sampler, model, [data])["fitness"]
     wandb.log({"fitness": np.mean(fitness), "fitnesses": fitness})
 
 
