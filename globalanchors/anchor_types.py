@@ -285,7 +285,7 @@ class Population:
         initial_fitness = 0
         self.individuals = sorted(
             [
-                Individual(example.tokens, initial_fitness)
+                Individual(example.tokens.copy(), initial_fitness)
                 for _ in range(num_samples)
             ]
         )
