@@ -1,6 +1,6 @@
 """Base anchor functions"""
 
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 import numpy as np
 
 from loguru import logger
@@ -161,7 +161,7 @@ class TextAnchors:
 
     def _get_best_candidates(
         self, candidates: List[CandidateAnchor], state: BeamState
-    ) -> List[int]:
+    ) -> Tuple[List[CandidateAnchor], List[int]]:
         """Finds the best candidate anchors using the KL-LUCB algorithm (https://proceedings.mlr.press/v30/Kaufmann13.html).
 
         Args:
@@ -174,7 +174,7 @@ class TextAnchors:
         n_features = len(candidates)
         # handle length 1 case
         if n_features == 1:
-            return [0]
+            return candidates, [0]
         n_samples = np.array([cand.num_samples for cand in candidates])
         n_positives = np.array([cand.num_positives for cand in candidates])
         upper_bounds = np.zeros(n_features)
@@ -187,6 +187,7 @@ class TextAnchors:
             )
             n_samples[i] = candidates[i].num_samples
             n_positives[i] = candidates[i].num_positives
+            logger.debug(f"Num Samples after correcting for candidate {i}: {n_samples}.")
 
         # define function to calculate bounds from array
         def _update_bounds(t, means):
@@ -236,7 +237,7 @@ class TextAnchors:
             lower_i, upper_i = _update_bounds(t, means)
             diff = upper_bounds[upper_i] - lower_bounds[lower_i]
         sorted_means = np.argsort(means)
-        return sorted_means[-top_n:]
+        return candidates, sorted_means[-top_n:]
 
     def _beam_search(self, example: str) -> CandidateAnchor:
         """Performs beam-search to greedily find the best anchors as explanations.
@@ -334,7 +335,7 @@ class TextAnchors:
                 )
                 break
             # select the new best candidates with confidence bounds
-            candidate_indices = self._get_best_candidates(candidates, state)
+            candidates, candidate_indices = self._get_best_candidates(candidates, state)
             best_anchors_per_size[current_size] = [
                 candidates[i] for i in candidate_indices
             ]
