@@ -1,0 +1,33 @@
+program: globalanchors/visualize.py
+method: grid
+name: genetic_sweep
+metric:
+  goal: maximize
+  name: fitness
+
+parameters:
+  dataloader:
+    value: polarity
+
+  model:
+    value: svm
+
+  sampler:
+    value: genetic
+
+  sampler.crossover_prop:
+    value: 0.5
+
+  sampler.mutation_prob:
+    values: [0.05, 0.1, 0.15, 0.2]
+
+  sampler.n_generations:
+    values: [5, 10, 25, 50, 75, 100]
+  
+command:
+  - ${env}
+  - HYDRA_FULL_ERROR=1
+  - WANDB_START_METHOD=thread
+  - python
+  - ${program}
+  - ${args_no_hyphens}

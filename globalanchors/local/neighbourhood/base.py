@@ -67,7 +67,6 @@ class NeighbourhoodSampler(ABC):
         mask_results = self.fill_masker(masked_texts, top_k=top_k)
         for i, masked_input in enumerate(masked_texts):
             # mask_results[i] is a list of dictionaries (or mask_results is a list of dictionaries if no batch is used)
-            print(mask_results[0])
             words = (
                 [result["token_str"] for result in mask_results[i]]
                 if len(masked_texts) > 1

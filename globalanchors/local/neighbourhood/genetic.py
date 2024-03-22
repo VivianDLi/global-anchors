@@ -9,7 +9,6 @@ import numpy as np
 from sentence_transformers import util
 
 from globalanchors.local.neighbourhood.base import NeighbourhoodSampler
-from globalanchors.local.utils import get_distance_function
 from globalanchors.anchor_types import (
     InputData,
     Model,
@@ -25,14 +24,12 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         crossover_prop: float = 0.5,
         mutation_prob: float = 0.2,
         n_generations: int = 10,
-        distance_function: DistanceFunctionType = "neuclid",
     ):
         self.crossover_prop = (
             crossover_prop  # proportion of population to crossover
         )
         self.mutation_prob = mutation_prob
         self.n_generations = n_generations
-        self.distance_function = get_distance_function(distance_function)
         super().__init__(
             use_generator=True,
             use_generator_probabilities=False,
@@ -168,7 +165,7 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         required_features: List[str],
         example: InputData,
         model: Model,
-    ) -> Tuple[np.ndarray, List[str]]:
+    ) -> Tuple[np.ndarray, List[str], List[float]]:
         population_size = len(population.individuals)
         data = np.zeros((population_size, len(example.tokens)), dtype=int)
         fitness_fn = partial(
@@ -188,8 +185,9 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         for i, indv in enumerate(population.individuals):
             data[i] = example.tokens == indv.gene
         string_data = [" ".join(indv.gene) for indv in population.individuals]
+        fitnesses = [indv.fitness for indv in population.individuals]
         logger.debug(f"Generated strings: {string_data}.")
-        return data, string_data
+        return data, string_data, fitnesses
 
     def generate_samples(
         self,
@@ -197,7 +195,7 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         num_samples: int,
         required_features: List[str],
         model: Model,
-    ) -> Tuple[np.ndarray, List[str]]:
+    ) -> Tuple[np.ndarray, List[str], List[float]]:
         """_summary_
 
         Args:
@@ -207,32 +205,33 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
             model (Model): _description_
 
         Returns:
-            Tuple[np.ndarray, List[str]]: _description_
+            Tuple[np.ndarray, List[str], List[float]]: _description_
         """
         if num_samples == 1:
             # generate a single sample
             population = Population(example, 1)
-            data, string_data = self._genetic_algorithm(
+            data, string_data, fitnesses = self._genetic_algorithm(
                 population, True, required_features, example, model
             )
-            return data, string_data
+            return data, string_data, fitnesses
         # initialize population from example and evaluate preliminary fitnesses
         different_population = Population(example, num_samples // 2)
         matching_population = Population(
             example, num_samples - num_samples // 2
         )
         # generate samples with matching labels
-        matching_data, matching_samples = self._genetic_algorithm(
+        matching_data, matching_samples, matching_fitnesses = self._genetic_algorithm(
             matching_population, True, required_features, example, model
         )
         # generate samples with non-matching labels
-        different_data, different_samples = self._genetic_algorithm(
+        different_data, different_samples, different_fitnesses = self._genetic_algorithm(
             different_population, False, required_features, example, model
         )
         # combine samples and return
         return (
             np.vstack((matching_data, different_data)),
             matching_samples + different_samples,
+            matching_fitnesses + different_fitnesses
         )
 
     # override
@@ -247,7 +246,7 @@ class GeneticAlgorithmSampler(NeighbourhoodSampler):
         assert len(data) > 0, "Data array must have at least one sample."
         # get anchor required tokens (assuming constant probability => data is the same for all samples)
         required_features = example.tokens[data[0] == 1].tolist()
-        data, string_data = self.generate_samples(
+        data, string_data, _ = self.generate_samples(
             example, data.shape[0], required_features, model
         )
         # compute labels (optional)

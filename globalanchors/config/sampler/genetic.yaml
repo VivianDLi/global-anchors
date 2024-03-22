@@ -2,4 +2,3 @@ _target_: globalanchors.local.neighbourhood.genetic.GeneticAlgorithmSampler
 crossover_prop: 0.5
 mutation_prob: 0.1
 n_generations: 10
-distance_function: cosine

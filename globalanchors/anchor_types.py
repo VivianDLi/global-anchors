@@ -54,6 +54,8 @@ class GlobalMetrics(TypedDict):
     accuracy: float
     coverage: float
 
+class GeneticMetrics(TypedDict):
+    fitness: np.array
 
 ## Anchors Types
 
